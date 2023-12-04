@@ -1,0 +1,46 @@
+{
+	"Butanol": {
+		"density": 0.8098,
+		"index": 1.3993
+	},
+	"Chloroform": {
+		"density": 1.484,
+		"index": 1.4459
+	},
+	"DCM": {
+		"density": 1.3255,
+		"index": 1.4244
+	},
+	"DMF": {
+		"density": 0.9445,
+		"index": 1.4305
+	},
+	"DMSO": {
+		"density": 1.101,
+		"index": 1.4783
+	},
+	"DMSO (Deuterated)": {
+		"density": 1.19,
+		"index": 1.476
+	},
+	"Ethanol": {
+		"density": 0.7893,
+		"index": 1.3611
+	},
+	"THF": {
+		"density": 0.8833,
+		"index": 1.405
+	},
+	"Toluene": {
+		"density": 0.8623,
+		"index": 1.4967
+	},
+	"Water": {
+		"density": 1,
+		"index": 1.333
+	},
+	"Water (Deuterated)": {
+		"density": 1.1044,
+		"index": 1.3283
+	}
+}
