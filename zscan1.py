@@ -2441,10 +2441,10 @@ class Fitting():
         return result
 
     # The function to be minimized in automated fitting
-    def fcn2min(self,params,*weigths):
+    def fcn2min(self,params,*weights):
         pars = params.valuesdict().values()
         ynew = self.manual(*pars)
-        return weigths*(ynew-self.ydata) # instead of SSE. Somehow this works best.
+        return weights*(ynew-self.ydata) # instead of SSE. Somehow this works best.
 
     # The actual processor for automatic fitting
     def automatic(self, z_range, ftype:str, stype:str, line_xydata):
