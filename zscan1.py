@@ -1146,7 +1146,8 @@ class Window(QtWidgets.QMainWindow):
                 # else:
                 #     data_points = self.silicaCA_figure.axes.get_lines()[0]
                 #     deltaTpv, self.silicaCA_DPhi0, deltaZpv, self.silica_rayleighLength, self.silicaCA_beamwaist, self.numerical_aperture = self.read_variables_from_fitting_line_geometry(data_points, "CA")
-                    
+                
+                #THIS ONE ALLOWS TO UPDATE AMPLITUDE AND BREADTH OF FIT LINE WHEN SLIDERS CHANGE VALUE IN ALL CASES!!!!!!    
                 else: # This should run only when data is loaded in this CASE for the first time in the program session
                     self.silicaCA_DPhi0 = self.silicaCA_DPhi0_slider.value()/self.silicaCA_DPhi0_slider.maximum()*np.pi
                     self.silica_rayleighLength = self.silicaCA_deltaZpv_slider.value()/1000/1.7
