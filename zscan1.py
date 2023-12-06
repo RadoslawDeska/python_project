@@ -2412,9 +2412,14 @@ class Integration():
 
                 self.E += self.fm[m]*np.exp(1j*self.tm)*self.wm0/self.wm/self.wz*np.exp((-1/self.wm**2+1j*np.pi/self.lda/self.Rm)*(rr*self.dr)**2)
         
-            self.Tz += np.abs(self.E)**2*rr*self.dr**2 # transmittance through aperture plane
+            self.Tz += np.abs(self.E)**2*rr*self.dr # transmittance through aperture plane
         
-        # Normalize transmitted power before dividing CA/OA (not sure it's OK)
+        # T(z)=P_T/(S*P_i), where S=1-exp(-2*ra^2/wa^2)
+        #S = 1-np.exp(-2*self.ra**2/self.wa**2)
+        #I0 - instantaneous laser fluence - this is missing (we want to get it)
+        #self.Tznorm = 3E8*8.854E-12*self.Tz/(S*self.w0**2/2*I0)
+        
+        # Normalize transmitted power before dividing CA/OA (the only way of normalization when we don't have I0)
         self.Tznorm = 2*self.Tz/(np.average(self.Tz[0:10])+np.average(self.Tz[len(self.Tz)-10:]))
 
         return self.Tznorm
@@ -2435,8 +2440,8 @@ class Fitting():
         '''Returns integrated field for given input parameters
         
         ONLY FOR n2 FOR NOW!!!!!!!!!!!!!'''
-        self.z_range = z_range
-        self.sample_type.z = np.array([self.z_range*(zz - centerpoint)/self.nop-self.z_range/2 for zz in range(self.nop)])
+        self.z_range = z_range # in meters
+        self.sample_type.z = np.array([self.z_range*(zz - centerpoint)/self.nop-self.z_range/2 for zz in range(self.nop)]) # in meters
         window.get_general_parameters()
         if stype == "CA":
             self.sample_type.derive(amplitude,beamwaist,window.d0,window.ra,stype)
