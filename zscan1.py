@@ -35,7 +35,7 @@ import sys
 
 # CONSTANTS
 SILICA_BETA = 0
-N_COMPONENTS = 5 # number of electric field components (for Gaussian decomposition)
+N_COMPONENTS = 8 # number of electric field components (for Gaussian decomposition)
 INTEGRATION_STEPS = 30 # accuracy of integration infinitesimal element, dx.
 CUVETTE_PATH_LENGTH = 0.001 # [m] path length inside cuvette
 SOLVENT_T_SLIDER_MAX = 1
@@ -1137,17 +1137,21 @@ class Window(QtWidgets.QMainWindow):
         If only fitting line exists, retrieve physical parameters. Otherwise, retrieve from sliders'''
         match ftype:
             case "Silica":
+                self.silicaCA_zeroLevel = self.silicaCA_zeroLevel_slider.value()/100
+                self.silicaCA_centerPoint = self.silicaCA_centerPoint_slider.value()-50
+                
                 if self.silicaCA_fittingLine_drawn == True and line_updated == True: # This is true for fit_automatically
                     deltaTpv, self.silicaCA_DPhi0, deltaZpv, self.silica_rayleighLength, self.silicaCA_beamwaist, self.numerical_aperture = self.read_variables_from_fitting_line_geometry(self.silica_fitting_line_ca, "CA")
                 
+                # else:
+                #     data_points = self.silicaCA_figure.axes.get_lines()[0]
+                #     deltaTpv, self.silicaCA_DPhi0, deltaZpv, self.silica_rayleighLength, self.silicaCA_beamwaist, self.numerical_aperture = self.read_variables_from_fitting_line_geometry(data_points, "CA")
+                    
                 else: # This should run only when data is loaded in this CASE for the first time in the program session
                     self.silicaCA_DPhi0 = self.silicaCA_DPhi0_slider.value()/self.silicaCA_DPhi0_slider.maximum()*np.pi
                     self.silica_rayleighLength = self.silicaCA_deltaZpv_slider.value()/1000/1.7
                     self.silicaCA_beamwaist = float(np.sqrt(self.silica_rayleighLength*self.lda/np.pi)) # [m]
                     self.numerical_aperture = self.silicaCA_beamwaist/self.silica_rayleighLength # numerical aperture of the beam
-                
-                self.silicaCA_zeroLevel = self.silicaCA_zeroLevel_slider.value()/100
-                self.silicaCA_centerPoint = self.silicaCA_centerPoint_slider.value()-50
                     
             case "Solvent":
                 if self.solventCA_fittingLine_drawn == True and line_updated == True:
@@ -1243,6 +1247,11 @@ class Window(QtWidgets.QMainWindow):
                 rayleighLength = deltaZpv/1.7 # [m] Rayleigh length
                 beamwaist = np.sqrt(rayleighLength*self.lda/np.pi) # [m] beam radius in focal point
                 numerical_aperture = beamwaist/rayleighLength
+                
+                self.lev0curve.setValue(self.silicaCA_zeroLevel)
+                self.dfcurve.setValue(deltaPhi0)
+                self.ccurve.setValue(self.silicaCA_centerPoint)
+                self.dzcurve.setValue(deltaZpv)
                                 
                 return deltaTpv, deltaPhi0, deltaZpv, rayleighLength, beamwaist, numerical_aperture
             
