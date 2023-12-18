@@ -1137,22 +1137,36 @@ class Window(QtWidgets.QMainWindow):
         If only fitting line exists, retrieve physical parameters. Otherwise, retrieve from sliders'''
         match ftype:
             case "Silica":
+                nop = len(self.silicaCA_figure.axes.get_lines()[0].get_data()[0])
                 self.silicaCA_zeroLevel = self.silicaCA_zeroLevel_slider.value()/100
-                self.silicaCA_centerPoint = self.silicaCA_centerPoint_slider.value()-50
+                self.silicaCA_centerPoint = np.round(self.silicaCA_centerPoint_slider.value()-nop/2)
                 
                 if self.silicaCA_fittingLine_drawn == True and line_updated == True: # This is true for fit_automatically
                     deltaTpv, self.silicaCA_DPhi0, deltaZpv, self.silica_rayleighLength, self.silicaCA_beamwaist, self.numerical_aperture = self.read_variables_from_fitting_line_geometry(self.silica_fitting_line_ca, "CA")
                 
+                else:
+                    '''On the first load of data this gives the parameters for a curve that is very close to the expected one'''
+                    ''' CURRENTLY THE CURVE IS NOT EXACTLY AS IT SHOULD BE BASED ON DeltaZ AND DeltaT to give DPhi0 and Beamwaist.
+                        THE CURVE IS TOO NARROW AND SPREAD VERTICALLY TOO MUCH. What has to be corrected is the way the curve is calculated
+                        so that it renders properly shaped function... '''
+                    z = self.silicaCA_figure.axes.get_lines()[0].get_data()[0]
+                    Tz = self.silicaCA_figure.axes.get_lines()[0].get_data()[1]
+                    self.silicaCA_DPhi0 = (np.max(Tz) - np.min(Tz))/0.406
+                    self.silica_rayleighLength = (z[np.where(Tz==np.max(Tz))[0][0]] - z[np.where(Tz==np.min(Tz))[0][0]])/1.7/1000
+                    self.silicaCA_beamwaist = float(np.sqrt(self.silica_rayleighLength*self.lda/np.pi))
+                    self.numerical_aperture = self.silicaCA_beamwaist/self.silica_rayleighLength
+                    
+                    print(self.silicaCA_DPhi0, self.silica_rayleighLength, self.silicaCA_beamwaist, self.numerical_aperture)
                 # else:
                 #     data_points = self.silicaCA_figure.axes.get_lines()[0]
                 #     deltaTpv, self.silicaCA_DPhi0, deltaZpv, self.silica_rayleighLength, self.silicaCA_beamwaist, self.numerical_aperture = self.read_variables_from_fitting_line_geometry(data_points, "CA")
                 
-                #THIS ONE ALLOWS TO UPDATE AMPLITUDE AND BREADTH OF FIT LINE WHEN SLIDERS CHANGE VALUE IN ALL CASES!!!!!!    
-                else: # This should run only when data is loaded in this CASE for the first time in the program session
-                    self.silicaCA_DPhi0 = self.silicaCA_DPhi0_slider.value()/self.silicaCA_DPhi0_slider.maximum()*np.pi
-                    self.silica_rayleighLength = self.silicaCA_deltaZpv_slider.value()/1000/1.7
-                    self.silicaCA_beamwaist = float(np.sqrt(self.silica_rayleighLength*self.lda/np.pi)) # [m]
-                    self.numerical_aperture = self.silicaCA_beamwaist/self.silica_rayleighLength # numerical aperture of the beam
+                # #THIS ONE ALLOWS TO UPDATE AMPLITUDE AND BREADTH OF FIT LINE WHEN SLIDERS CHANGE VALUE IN ALL CASES!!!!!!    
+                # else: # This should run only when data is loaded in this CASE for the first time in the program session
+                #     self.silicaCA_DPhi0 = self.silicaCA_DPhi0_slider.value()/self.silicaCA_DPhi0_slider.maximum()*np.pi
+                #     self.silica_rayleighLength = self.silicaCA_deltaZpv_slider.value()/1000/1.7
+                #     self.silicaCA_beamwaist = float(np.sqrt(self.silica_rayleighLength*self.lda/np.pi)) # [m]
+                #     self.numerical_aperture = self.silicaCA_beamwaist/self.silica_rayleighLength # numerical aperture of the beam
                     
             case "Solvent":
                 if self.solventCA_fittingLine_drawn == True and line_updated == True:
@@ -1840,6 +1854,7 @@ class Window(QtWidgets.QMainWindow):
                             self.sampleOA_figure.draw_idle()
 
     def fit_automatically(self, ftype:str, stype:str):
+        ''' IT SEEMS THAT the issue with different values from fit and from geometry is in General Parameters that are wrongly indicated - I don't have proper values.'''
         self.get_general_parameters()
         
         self.get_curve_interpretation(ftype,line_updated=True)
@@ -2481,7 +2496,7 @@ class Fitting():
         # Apply initial values
         self.params = Parameters()
         self.params.add('Zero', value=self.zero_level, min=0.75, max=1.25)
-        self.params.add('Center', value=self.centerpoint, min=-50, max=50, vary=vary_centerpoint)
+        self.params.add('Center', value=self.centerpoint, min=-50, max=50, vary=vary_centerpoint) # in number of datapoints
         
         if stype == "CA":
             self.params.add('DPhi0', value=self.amplitude, min=-2, max=2)
