@@ -45,7 +45,7 @@ class Window(QtWidgets.QMainWindow):
 # INITIALIZATION
     def __init__(self):
         super(Window, self).__init__()
-        uic.loadUi('.\\window.ui', self)
+        uic.loadUi(os.path.join(os.path.dirname(__file__), './window.ui'), self)
         
         # Additions to UI design
         #self.path = os.path.join("C:/z-scan/_wyniki/") # default main directory for z-scan data
@@ -125,7 +125,7 @@ class Window(QtWidgets.QMainWindow):
         # Populate Solvent combobox with data from file
         if caller == "":
             try:
-                json_file = open('.\\solvents.json')
+                json_file = open(os.path.join(os.path.dirname(__file__), 'solvents.json'))
             
             except FileNotFoundError:
                 self.showdialog('Warning','solvents.json not found in the default location. Select the file.')
@@ -2422,7 +2422,7 @@ class Integration():
                 self.wm0 = self.wz/np.sqrt((2*m+1))
                 self.dm = 0.5*self.k*self.wm0**2
                 self.wm = self.wm0*np.sqrt(self.g**2+self.d**2/self.dm**2)
-                self.tm = np.arctan((self.d/self.dm)/self.g)
+                self.tm = np.arctan(self.g/(self.d/self.dm))
                 self.Rm = self.d/(1-self.g/(self.g**2+self.d**2/self.dm**2))
 
                 self.E += self.fm[m]*np.exp(1j*self.tm)*self.wm0/self.wm/self.wz*np.exp((-1/self.wm**2+1j*np.pi/self.lda/self.Rm)*(rr*self.dr)**2)
