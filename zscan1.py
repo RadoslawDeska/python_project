@@ -49,7 +49,7 @@ class Window(QtWidgets.QMainWindow):
         
         # Additions to UI design
         #self.path = os.path.join("C:/z-scan/_wyniki/") # default main directory for z-scan data
-        self.path = os.path.join("C:/Users/Radek/OneDrive - Politechnika Wroclawska/Praca/oprogramowanie/z-scan/_wyniki/2022_03_11")
+        self.path = os.path.join(os.path.dirname(__file__),'data')
         self.mainDirectory_lineEdit.setText(self.path.replace("/","\\"))
         self.dataDirectory_lineEdit.setText(self.path.replace("/","\\"))
         
@@ -1262,12 +1262,7 @@ class Window(QtWidgets.QMainWindow):
                 rayleighLength = deltaZpv/1.7 # [m] Rayleigh length
                 beamwaist = np.sqrt(rayleighLength*self.lda/np.pi) # [m] beam radius in focal point
                 numerical_aperture = beamwaist/rayleighLength
-                
-                self.lev0curve.setValue(self.silicaCA_zeroLevel)
-                self.dfcurve.setValue(deltaPhi0)
-                self.ccurve.setValue(self.silicaCA_centerPoint)
-                self.dzcurve.setValue(deltaZpv)
-                                
+                                                
                 return deltaTpv, deltaPhi0, deltaZpv, rayleighLength, beamwaist, numerical_aperture
             
             except TypeError:
@@ -1343,8 +1338,6 @@ class Window(QtWidgets.QMainWindow):
 
             case "Sample":
                 pass
-            
-        pass
         
     def calculate_derived_parameters(self, ftype, stype, line_updated=False):#, caller="manual"):
         '''Calculates `l_silica`, `silica_n2`, `laserI0` and runs `get_curve_interpretation()`
@@ -1854,7 +1847,6 @@ class Window(QtWidgets.QMainWindow):
                             self.sampleOA_figure.draw_idle()
 
     def fit_automatically(self, ftype:str, stype:str):
-        ''' IT SEEMS THAT the issue with different values from fit and from geometry is in General Parameters that are wrongly indicated - I don't have proper values.'''
         self.get_general_parameters()
         
         self.get_curve_interpretation(ftype,line_updated=True)
@@ -2105,12 +2097,13 @@ class Window(QtWidgets.QMainWindow):
         Message type (msg_type) is one of these: 'Error', 'Warning', 'Info'
         '''
         args = (msg_type, message)
-        if msg_type == "Error":
-            button = QMessageBox.critical(self, *args)
-        elif msg_type == "Warning":
-            button = QMessageBox.warning(self, *args)
-        elif msg_type == "Info":
-            button = QMessageBox.information(self, *args)
+        match msg_type:
+            case "Error":
+                button = QMessageBox.critical(self, *args)
+            case "Warning":
+                button = QMessageBox.warning(self, *args)
+            case "Info":
+                button = QMessageBox.information(self, *args)
         
         #if button == QMessageBox.Ok:
         #    pass
@@ -2438,7 +2431,6 @@ class Integration():
         self.Tznorm = 2*self.Tz/(np.average(self.Tz[0:10])+np.average(self.Tz[len(self.Tz)-10:]))
 
         return self.Tznorm
-
 class Fitting():
     def __init__(self, sample_type: Integration, amplitude, beamwaist, zero_level, centerpoint, nop, data):
         super(Fitting, self).__init__()
