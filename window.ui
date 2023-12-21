@@ -55,6 +55,7 @@
      </property>
      <property name="font">
       <font>
+       <weight>75</weight>
        <bold>true</bold>
       </font>
      </property>
@@ -1213,6 +1214,7 @@ border:None;</string>
        </property>
        <property name="font">
         <font>
+         <weight>75</weight>
          <italic>false</italic>
          <bold>true</bold>
         </font>
@@ -1507,6 +1509,7 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -1523,6 +1526,7 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -1569,7 +1573,7 @@ border:None;</string>
              <x>20</x>
              <y>380</y>
              <width>421</width>
-             <height>52</height>
+             <height>62</height>
             </rect>
            </property>
            <layout class="QGridLayout" name="gridLayout_5">
@@ -1599,16 +1603,17 @@ border:None;</string>
              <widget class="QLabel" name="label_44">
               <property name="font">
                <font>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
               <property name="text">
-               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;right&quot;&gt;ΔZ&lt;span style=&quot; vertical-align:sub;&quot;&gt;pv&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;right&quot;&gt;Z&lt;span style=&quot; vertical-align:sub;&quot;&gt;Rayleigh&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
               </property>
              </widget>
             </item>
             <item row="1" column="1">
-             <widget class="QSlider" name="silicaCA_deltaZpv_slider">
+             <widget class="QSlider" name="silicaCA_RayleighLength_slider">
               <property name="enabled">
                <bool>false</bool>
               </property>
@@ -1616,19 +1621,22 @@ border:None;</string>
                <string>This slider controls the width of the curve, but other sliders may influence apparent width as well.</string>
               </property>
               <property name="minimum">
-               <number>1</number>
+               <number>0</number>
               </property>
               <property name="maximum">
-               <number>85</number>
+               <number>2000</number>
               </property>
               <property name="pageStep">
                <number>1</number>
               </property>
               <property name="value">
-               <number>40</number>
+               <number>400</number>
               </property>
               <property name="orientation">
                <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="tickPosition">
+               <enum>QSlider::NoTicks</enum>
               </property>
              </widget>
             </item>
@@ -1636,6 +1644,7 @@ border:None;</string>
              <widget class="QLabel" name="label_45">
               <property name="font">
                <font>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -2296,7 +2305,7 @@ border:None;</string>
              <rect>
               <x>180</x>
               <y>10</y>
-              <width>171</width>
+              <width>177</width>
               <height>44</height>
              </rect>
             </property>
@@ -2325,7 +2334,7 @@ border:None;</string>
              <rect>
               <x>10</x>
               <y>11</y>
-              <width>157</width>
+              <width>164</width>
               <height>68</height>
              </rect>
             </property>
@@ -2341,6 +2350,7 @@ border:None;</string>
               <widget class="QLabel" name="label_67">
                <property name="font">
                 <font>
+                 <weight>75</weight>
                  <bold>true</bold>
                 </font>
                </property>
@@ -2532,6 +2542,7 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -2548,6 +2559,7 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -3112,7 +3124,7 @@ border:None;</string>
              <rect>
               <x>10</x>
               <y>10</y>
-              <width>157</width>
+              <width>164</width>
               <height>68</height>
              </rect>
             </property>
@@ -3128,6 +3140,7 @@ border:None;</string>
               <widget class="QLabel" name="label_74">
                <property name="font">
                 <font>
+                 <weight>75</weight>
                  <bold>true</bold>
                 </font>
                </property>
@@ -3174,7 +3187,7 @@ border:None;</string>
              <rect>
               <x>180</x>
               <y>10</y>
-              <width>171</width>
+              <width>177</width>
               <height>44</height>
              </rect>
             </property>
@@ -3213,6 +3226,7 @@ border:None;</string>
              <widget class="QLabel" name="label_83">
               <property name="font">
                <font>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -3247,6 +3261,7 @@ border:None;</string>
              <widget class="QLabel" name="label_79">
               <property name="font">
                <font>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -3367,6 +3382,7 @@ border:None;</string>
              <widget class="QLabel" name="label_103">
               <property name="font">
                <font>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -3938,6 +3954,7 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -3954,6 +3971,7 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -4111,7 +4129,7 @@ border:None;</string>
              <rect>
               <x>10</x>
               <y>10</y>
-              <width>157</width>
+              <width>164</width>
               <height>68</height>
              </rect>
             </property>
@@ -4127,6 +4145,7 @@ border:None;</string>
               <widget class="QLabel" name="label_73">
                <property name="font">
                 <font>
+                 <weight>75</weight>
                  <bold>true</bold>
                 </font>
                </property>
@@ -4173,7 +4192,7 @@ border:None;</string>
              <rect>
               <x>180</x>
               <y>10</y>
-              <width>171</width>
+              <width>177</width>
               <height>44</height>
              </rect>
             </property>
@@ -4271,7 +4290,7 @@ border:None;</string>
              <rect>
               <x>360</x>
               <y>60</y>
-              <width>238</width>
+              <width>258</width>
               <height>46</height>
              </rect>
             </property>
@@ -4434,6 +4453,7 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -4450,6 +4470,7 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -5014,7 +5035,7 @@ border:None;</string>
              <rect>
               <x>10</x>
               <y>10</y>
-              <width>157</width>
+              <width>164</width>
               <height>68</height>
              </rect>
             </property>
@@ -5030,6 +5051,7 @@ border:None;</string>
               <widget class="QLabel" name="label_76">
                <property name="font">
                 <font>
+                 <weight>75</weight>
                  <bold>true</bold>
                 </font>
                </property>
@@ -5076,7 +5098,7 @@ border:None;</string>
              <rect>
               <x>180</x>
               <y>10</y>
-              <width>171</width>
+              <width>177</width>
               <height>44</height>
              </rect>
             </property>
@@ -5115,6 +5137,7 @@ border:None;</string>
              <widget class="QLabel" name="label_139">
               <property name="font">
                <font>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -5149,6 +5172,7 @@ border:None;</string>
              <widget class="QLabel" name="label_80">
               <property name="font">
                <font>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -5269,6 +5293,7 @@ border:None;</string>
              <widget class="QLabel" name="label_140">
               <property name="font">
                <font>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -5840,6 +5865,7 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -5856,6 +5882,7 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -6013,7 +6040,7 @@ border:None;</string>
              <rect>
               <x>10</x>
               <y>10</y>
-              <width>157</width>
+              <width>164</width>
               <height>68</height>
              </rect>
             </property>
@@ -6029,6 +6056,7 @@ border:None;</string>
               <widget class="QLabel" name="label_77">
                <property name="font">
                 <font>
+                 <weight>75</weight>
                  <bold>true</bold>
                 </font>
                </property>
@@ -6075,7 +6103,7 @@ border:None;</string>
              <rect>
               <x>180</x>
               <y>10</y>
-              <width>171</width>
+              <width>177</width>
               <height>44</height>
              </rect>
             </property>
@@ -6173,7 +6201,7 @@ border:None;</string>
              <rect>
               <x>360</x>
               <y>60</y>
-              <width>238</width>
+              <width>258</width>
               <height>46</height>
              </rect>
             </property>
@@ -6597,6 +6625,7 @@ border:None;</string>
        </property>
        <property name="font">
         <font>
+         <weight>75</weight>
          <bold>true</bold>
         </font>
        </property>
@@ -6615,6 +6644,7 @@ border:None;</string>
        </property>
        <property name="font">
         <font>
+         <weight>75</weight>
          <bold>true</bold>
         </font>
        </property>
@@ -6633,6 +6663,7 @@ border:None;</string>
        </property>
        <property name="font">
         <font>
+         <weight>75</weight>
          <bold>true</bold>
         </font>
        </property>
@@ -6840,6 +6871,7 @@ QPushButton::enabled{
      <property name="font">
       <font>
        <pointsize>12</pointsize>
+       <weight>75</weight>
        <bold>true</bold>
       </font>
      </property>
@@ -6863,7 +6895,7 @@ QPushButton::pressed{border-style:inset}</string>
      <x>0</x>
      <y>0</y>
      <width>1340</width>
-     <height>22</height>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -6968,7 +7000,7 @@ QPushButton::pressed{border-style:inset}</string>
   <tabstop>silicaAperture_tabWidget</tabstop>
   <tabstop>silicaCA_zeroLevel_slider</tabstop>
   <tabstop>silicaCA_DPhi0_slider</tabstop>
-  <tabstop>silicaCA_deltaZpv_slider</tabstop>
+  <tabstop>silicaCA_RayleighLength_slider</tabstop>
   <tabstop>silicaCA_fit_pushButton</tabstop>
   <tabstop>silicaCA_deltaPhi0Summary_doubleSpinBox</tabstop>
   <tabstop>silicaCA_laserIntensitySummary_doubleSpinBox</tabstop>

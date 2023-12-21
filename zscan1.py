@@ -160,9 +160,19 @@ class Window(QtWidgets.QMainWindow):
         self.endPos_doubleSpinBox.editingFinished.connect(lambda: self.measurement_plot_rescale("end"))
         self.startPos_doubleSpinBox.editingFinished.connect(lambda: self.measurement_plot_rescale("start"))
         self.stepsScan_spinBox.valueChanged.connect(self.measurement_plot_rescale)
+            
             # Data saving Tab
-        self.concentration_dataSavingTab_doubleSpinBox.editingFinished.connect(lambda: self.concentration_dataSavingTab_doubleSpinBox.setText(self.concentration_dataSavingTab_doubleSpinBox.text()+" %") if not "%" in self.concentration_dataSavingTab_doubleSpinBox.text() else self.concentration_dataSavingTab_doubleSpinBox.text())
-        self.wavelength_dataSavingTab_doubleSpinBox.editingFinished.connect(lambda: self.wavelength_dataSavingTab_doubleSpinBox.setText(self.wavelength_dataSavingTab_doubleSpinBox.text()+" nm") if not "nm" in self.wavelength_dataSavingTab_doubleSpinBox.text() else self.wavelength_dataSavingTab_doubleSpinBox.text())
+        self.concentration_dataSavingTab_doubleSpinBox.editingFinished.connect(
+            lambda: self.concentration_dataSavingTab_doubleSpinBox.setText(
+                self.concentration_dataSavingTab_doubleSpinBox.text()+" %")
+            if not "%" in self.concentration_dataSavingTab_doubleSpinBox.text()
+            else self.concentration_dataSavingTab_doubleSpinBox.text())
+        self.wavelength_dataSavingTab_doubleSpinBox.editingFinished.connect(
+            lambda: self.wavelength_dataSavingTab_doubleSpinBox.setText(
+                self.wavelength_dataSavingTab_doubleSpinBox.text()+" nm") 
+            if not "nm" in self.wavelength_dataSavingTab_doubleSpinBox.text() 
+            else self.wavelength_dataSavingTab_doubleSpinBox.text())
+            
             # Data fitting Tab
         self.solventName_comboBox.currentIndexChanged.connect(self.solvent_autocomplete)
         self.zscanRange_doubleSpinBox.editingFinished.connect(self.set_new_positions)
@@ -170,7 +180,7 @@ class Window(QtWidgets.QMainWindow):
     def slider_triggers(self):
         # Update display related to the sliders
             # Silica
-        self.slider_fit_manually_connect(self.silicaCA_deltaZpv_slider,"Connect")
+        self.slider_fit_manually_connect(self.silicaCA_RayleighLength_slider,"Connect")
         self.slider_fit_manually_connect(self.silicaCA_centerPoint_slider, "Connect")
         self.slider_fit_manually_connect(self.silicaCA_zeroLevel_slider, "Connect")
         self.slider_fit_manually_connect(self.silicaCA_DPhi0_slider, "Connect")
@@ -722,6 +732,10 @@ class Window(QtWidgets.QMainWindow):
         elif caller == "Load From File":
             # Load data
             def load_data():
+                """Fills proper frame in GUI with file information, sets current tab to lead the user,\n                
+                loads data on screen, toggles to active state the fitting controls and calls for the initial fit\n
+                for both CA and OA traces.
+                """
                 # Fill in names in QLineEdits
                 match ftype:
                     case "Silica":
@@ -867,7 +881,7 @@ class Window(QtWidgets.QMainWindow):
         1) "Disconnect" means current slider should be kept and all others should disconnect from their method
         2) "Connect" means reconnect all sliders to their method'''
         
-        silicaCA_sliders = [self.silicaCA_deltaZpv_slider, self.silicaCA_centerPoint_slider, self.silicaCA_zeroLevel_slider, self.silicaCA_DPhi0_slider]
+        silicaCA_sliders = [self.silicaCA_RayleighLength_slider, self.silicaCA_centerPoint_slider, self.silicaCA_zeroLevel_slider, self.silicaCA_DPhi0_slider]
         #silicaOA_sliders = [self.silicaOA_deltaZpv_slider, self.silicaOA_centerPoint_slider, self.silicaOA_zeroLevel_slider, self.silicaOA_deltaTpv_slider]
         #solventCA_sliders = [self.solventCA_deltaZpv_slider, self.solventCA_centerPoint_slider, self.solventCA_zeroLevel_slider, self.solventCA_deltaTpv_slider]
         #solventOA_sliders = [self.solventOA_deltaZpv_slider, self.solventOA_centerPoint_slider, self.solventOA_zeroLevel_slider, self.solventOA_deltaTpv_slider]
@@ -972,7 +986,7 @@ class Window(QtWidgets.QMainWindow):
     def switch_fitting_to_on_state(self, ftype:str):
         match ftype:
             case "Silica":
-                self.silicaCA_deltaZpv_slider.setEnabled(True)
+                self.silicaCA_RayleighLength_slider.setEnabled(True)
                 self.silicaCA_centerPoint_slider.setEnabled(True)
                 self.silicaCA_zeroLevel_slider.setEnabled(True)
                 self.silicaCA_DPhi0_slider.setEnabled(True)
@@ -1018,11 +1032,12 @@ class Window(QtWidgets.QMainWindow):
         # DISPLAY VALUES NON-ROUNDED
         match ftype:
             case "Silica":
-                self.silicaCA_deltaPhi0Summary_doubleSpinBox.setValue(self.silicaCA_DPhi0)
-                self.silicaCA_laserIntensitySummary_doubleSpinBox.setValue(self.laserI0*1E-13) # [GW/cm2]
-                self.silicaCA_beamwaistSummary_doubleSpinBox.setValue(self.silicaCA_beamwaist*1E6) # [um] radius in focal point
-                self.silicaCA_rayleighRangeSummary_doubleSpinBox.setValue(self.silica_rayleighLength*1E3) # [mm]
-                self.numericalAperture_doubleSpinBox.setValue(self.numerical_aperture)
+                if hasattr(self,'silicaCA_minimizerResult'):
+                    self.silicaCA_deltaPhi0Summary_doubleSpinBox.setValue(self.silicaCA_minimizerResult.params['DPhi0'])
+                    self.silicaCA_laserIntensitySummary_doubleSpinBox.setValue(self.laserI0*1E-13) # [GW/cm2]
+                    self.silicaCA_beamwaistSummary_doubleSpinBox.setValue(self.silicaCA_beamwaist*1E6) # [um] radius in focal point
+                    self.silicaCA_rayleighRangeSummary_doubleSpinBox.setValue(self.silicaCA_minimizerResult.params['DPhi0']*1E3) # [mm]
+                    self.numericalAperture_doubleSpinBox.setValue(self.numerical_aperture)
                 
             case "Solvent":
                 if stype == "CA":
@@ -1123,9 +1138,12 @@ class Window(QtWidgets.QMainWindow):
                 self.showdialog('Error', 'The fit converged, but another error occurred. Try using different initial parameters.')
 
     def get_general_parameters(self):
-        ''' Gets the values from general parameters frame and assigns variables.'''
-        self.lda = self.wavelength_dataFittingTab_doubleSpinBox.value()*1E-9 # [m] wavelength
+        """Gets the values from general parameters frame and assigns them to variables with basic SI units (mm -> m)
+        
+        `self.l_silica`, `self.lda`, `self.z_range`, `self.ra`, `self.d0`
+        """
         self.l_silica = self.silicaThickness_dataFittingTab_doubleSpinBox.value()*1E-3 # [m] silica thickness
+        self.lda = self.wavelength_dataFittingTab_doubleSpinBox.value()*1E-9 # [m] wavelength
         self.z_range = self.zscanRange_doubleSpinBox.value()*1E-3 # [m] z-scan range
         self.ra = self.apertureDiameter_doubleSpinBox.value()/2*1E-3 # [m] CA aperture radius
         self.d0 = self.apertureToFocusDistance_doubleSpinBox.value()*1E-3 # [m] distance from focal point to aperture plane
@@ -1137,6 +1155,7 @@ class Window(QtWidgets.QMainWindow):
         If only fitting line exists, retrieve physical parameters. Otherwise, retrieve from sliders'''
         match ftype:
             case "Silica":
+                print('Function get_curve_interpretation called')
                 nop = len(self.silicaCA_figure.axes.get_lines()[0].get_data()[0])
                 self.silicaCA_zeroLevel = self.silicaCA_zeroLevel_slider.value()/100
                 self.silicaCA_centerPoint = np.round(self.silicaCA_centerPoint_slider.value()-nop/2)
@@ -1156,7 +1175,6 @@ class Window(QtWidgets.QMainWindow):
                     self.silicaCA_beamwaist = float(np.sqrt(self.silica_rayleighLength*self.lda/np.pi))
                     self.numerical_aperture = self.silicaCA_beamwaist/self.silica_rayleighLength
                     
-                    print(self.silicaCA_DPhi0, self.silica_rayleighLength, self.silicaCA_beamwaist, self.numerical_aperture)
                 # else:
                 #     data_points = self.silicaCA_figure.axes.get_lines()[0]
                 #     deltaTpv, self.silicaCA_DPhi0, deltaZpv, self.silica_rayleighLength, self.silicaCA_beamwaist, self.numerical_aperture = self.read_variables_from_fitting_line_geometry(data_points, "CA")
@@ -1164,7 +1182,7 @@ class Window(QtWidgets.QMainWindow):
                 # #THIS ONE ALLOWS TO UPDATE AMPLITUDE AND BREADTH OF FIT LINE WHEN SLIDERS CHANGE VALUE IN ALL CASES!!!!!!    
                 # else: # This should run only when data is loaded in this CASE for the first time in the program session
                 #     self.silicaCA_DPhi0 = self.silicaCA_DPhi0_slider.value()/self.silicaCA_DPhi0_slider.maximum()*np.pi
-                #     self.silica_rayleighLength = self.silicaCA_deltaZpv_slider.value()/1000/1.7
+                #     self.silica_rayleighLength = self.silicaCA_RayleighLength_slider.value()/1000/1.7
                 #     self.silicaCA_beamwaist = float(np.sqrt(self.silica_rayleighLength*self.lda/np.pi)) # [m]
                 #     self.numerical_aperture = self.silicaCA_beamwaist/self.silica_rayleighLength # numerical aperture of the beam
                     
@@ -1279,12 +1297,12 @@ class Window(QtWidgets.QMainWindow):
             case "Silica":
                 # Silica CA sliders
                 # Because change in slider value triggers the 'fit_manually' method, it has to be disabled.
-                self.silicaCA_deltaZpv_slider.valueChanged.disconnect()
+                self.silicaCA_RayleighLength_slider.valueChanged.disconnect()
                 self.silicaCA_centerPoint_slider.valueChanged.disconnect()
                 self.silicaCA_zeroLevel_slider.valueChanged.disconnect()
                 self.silicaCA_DPhi0_slider.valueChanged.disconnect()
                 
-                self.silicaCA_deltaZpv_slider.setValue(int(round(self.silica_rayleighLength*1000*2*1.7)))
+                self.silicaCA_RayleighLength_slider.setValue(int(round(self.silica_rayleighLength*1000*2*1.7)))
                 self.silicaCA_centerPoint_slider.setValue(int(round(self.silicaCA_centerPoint*10)))
                 self.silicaCA_zeroLevel_slider.setValue(int(round(self.silicaCA_zeroLevel*100)))
                 self.silicaCA_DPhi0_slider.setValue(
@@ -1292,7 +1310,7 @@ class Window(QtWidgets.QMainWindow):
 
                 # And now when all is updated by the 'fit_automatically', reconnect the sliders to their slots
                 self.slider_triggers()
-                # self.silicaCA_deltaZpv_slider.valueChanged.connect(lambda: self.fit_manually(ftype="Silica", stype="CA"))
+                # self.silicaCA_RayleighLength_slider.valueChanged.connect(lambda: self.fit_manually(ftype="Silica", stype="CA"))
                 # self.silicaCA_centerPoint_slider.valueChanged.connect(lambda: self.fit_manually(ftype="Silica", stype="CA"))
                 # self.silicaCA_zeroLevel_slider.valueChanged.connect(lambda: self.fit_manually(ftype="Silica", stype="CA"))
                 # self.silicaCA_DPhi0_slider.valueChanged.connect(lambda: self.fit_manually(ftype="Silica", stype="CA"))
@@ -1307,7 +1325,7 @@ class Window(QtWidgets.QMainWindow):
                     self.solventCA_deltaTpv_slider.valueChanged.disconnect()
 
                     if self.solventCA_customBeamwaist_checkBox.isChecked() == False:
-                        self.solventCA_deltaZpv_slider.setValue(self.silicaCA_deltaZpv_slider.value())
+                        self.solventCA_deltaZpv_slider.setValue(self.silicaCA_RayleighLength_slider.value())
                     else:
                         self.solventCA_deltaZpv_slider.setValue(int(round(self.solventCA_beamwaist*1E6)))
                     self.solventCA_centerPoint_slider.setValue(int(round(self.solventCA_centerPoint+50)))
@@ -1848,7 +1866,6 @@ class Window(QtWidgets.QMainWindow):
 
     def fit_automatically(self, ftype:str, stype:str):
         self.get_general_parameters()
-        
         self.get_curve_interpretation(ftype,line_updated=True)
         
         match ftype:
@@ -1856,7 +1873,7 @@ class Window(QtWidgets.QMainWindow):
                 if stype == "CA":
                     # Data to be fitted
                     line = self.silicaCA_figure.axes.get_lines()[0]
-                elif stype == "OA":
+                else:
                     return
 
                 line_data = line.get_data()
@@ -1958,12 +1975,13 @@ class Window(QtWidgets.QMainWindow):
                 pass
 
     def fit_manually(self, ftype:str, stype:str, activated_by=None) -> None:
-        '''Triggered by:\n
-        1) fitting sliders\n
-        2) data loading (either from measurement or from file)'''
+        """Triggered by loading the data (from experiment or from file) or by fitting sliders value change.
 
-        caller = "manual"
-        
+        Args:
+            ftype (str): `Silica`, `Solvent`, `Sample`
+            stype (str): `CA`, `OA`
+            activated_by (_type_, optional): It shows which slider triggered the function. Defaults to None.
+        """
         if activated_by != None:
             self.slider_fit_manually_connect(activated_by, "Disconnect")
         
@@ -2022,13 +2040,9 @@ class Window(QtWidgets.QMainWindow):
                 pass
             
         self.calculate_derived_parameters(ftype, stype, line_updated=False)
-        
-        #self.set_sliders_positions(ftype, stype)
-        
+                
+        caller = "manual"
         self.set_fit_summary(ftype, stype, caller)
-        
-        #if activated_by != None:
-        #    self.slider_fit_manually_connect(activated_by, "Connect")
         
     def read_header_params(self, caller:str, ftype:str):
         if caller == "Current Measurement":
