@@ -55,7 +55,6 @@
      </property>
      <property name="font">
       <font>
-       <weight>75</weight>
        <bold>true</bold>
       </font>
      </property>
@@ -1214,7 +1213,6 @@ border:None;</string>
        </property>
        <property name="font">
         <font>
-         <weight>75</weight>
          <italic>false</italic>
          <bold>true</bold>
         </font>
@@ -1395,7 +1393,7 @@ border:None;</string>
         </rect>
        </property>
        <property name="currentIndex">
-        <number>0</number>
+        <number>1</number>
        </property>
        <widget class="QWidget" name="silicaTab">
         <attribute name="title">
@@ -1457,7 +1455,7 @@ border:None;</string>
             <number>125</number>
            </property>
            <property name="pageStep">
-            <number>1</number>
+            <number>0</number>
            </property>
            <property name="value">
             <number>100</number>
@@ -1485,7 +1483,7 @@ border:None;</string>
             <number>3142</number>
            </property>
            <property name="pageStep">
-            <number>1</number>
+            <number>0</number>
            </property>
            <property name="value">
             <number>566</number>
@@ -1509,7 +1507,6 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -1526,7 +1523,6 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -1589,7 +1585,7 @@ border:None;</string>
                <number>200</number>
               </property>
               <property name="pageStep">
-               <number>1</number>
+               <number>0</number>
               </property>
               <property name="value">
                <number>100</number>
@@ -1603,7 +1599,6 @@ border:None;</string>
              <widget class="QLabel" name="label_44">
               <property name="font">
                <font>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -1627,7 +1622,7 @@ border:None;</string>
                <number>2000</number>
               </property>
               <property name="pageStep">
-               <number>1</number>
+               <number>0</number>
               </property>
               <property name="value">
                <number>400</number>
@@ -1644,7 +1639,6 @@ border:None;</string>
              <widget class="QLabel" name="label_45">
               <property name="font">
                <font>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -2350,7 +2344,6 @@ border:None;</string>
               <widget class="QLabel" name="label_67">
                <property name="font">
                 <font>
-                 <weight>75</weight>
                  <bold>true</bold>
                 </font>
                </property>
@@ -2433,7 +2426,7 @@ border:None;</string>
           <enum>QTabWidget::North</enum>
          </property>
          <property name="currentIndex">
-          <number>1</number>
+          <number>0</number>
          </property>
          <widget class="QWidget" name="tab_2">
           <attribute name="title">
@@ -2478,7 +2471,7 @@ border:None;</string>
             <string>Fit CA!</string>
            </property>
           </widget>
-          <widget class="QSlider" name="solventCA_deltaTpv_slider">
+          <widget class="QSlider" name="solventCA_DPhi0_slider">
            <property name="enabled">
             <bool>false</bool>
            </property>
@@ -2494,13 +2487,13 @@ border:None;</string>
             <string>This slider controls the height of the curve, but other sliders may influence the height as well.</string>
            </property>
            <property name="maximum">
-            <number>400</number>
+            <number>3142</number>
            </property>
            <property name="pageStep">
-            <number>1</number>
+            <number>0</number>
            </property>
            <property name="value">
-            <number>250</number>
+            <number>566</number>
            </property>
            <property name="orientation">
             <enum>Qt::Vertical</enum>
@@ -2542,7 +2535,6 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -2559,12 +2551,11 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
               <property name="text">
-               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;ΔT&lt;span style=&quot; vertical-align:sub;&quot;&gt;pv&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;ΔΦ&lt;span style=&quot; vertical-align:sub;&quot;&gt;0&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
               </property>
               <property name="textFormat">
                <enum>Qt::RichText</enum>
@@ -2595,7 +2586,7 @@ border:None;</string>
             <number>125</number>
            </property>
            <property name="pageStep">
-            <number>1</number>
+            <number>0</number>
            </property>
            <property name="value">
             <number>100</number>
@@ -3140,7 +3131,6 @@ border:None;</string>
               <widget class="QLabel" name="label_74">
                <property name="font">
                 <font>
-                 <weight>75</weight>
                  <bold>true</bold>
                 </font>
                </property>
@@ -3226,7 +3216,6 @@ border:None;</string>
              <widget class="QLabel" name="label_83">
               <property name="font">
                <font>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -3236,21 +3225,21 @@ border:None;</string>
              </widget>
             </item>
             <item row="1" column="1">
-             <widget class="QSlider" name="solventCA_deltaZpv_slider">
+             <widget class="QSlider" name="solventCA_RayleighLength_slider">
               <property name="enabled">
                <bool>false</bool>
               </property>
               <property name="minimum">
-               <number>1</number>
+               <number>0</number>
               </property>
               <property name="maximum">
-               <number>85</number>
+               <number>2000</number>
               </property>
               <property name="pageStep">
-               <number>1</number>
+               <number>0</number>
               </property>
               <property name="value">
-               <number>40</number>
+               <number>400</number>
               </property>
               <property name="orientation">
                <enum>Qt::Horizontal</enum>
@@ -3261,12 +3250,11 @@ border:None;</string>
              <widget class="QLabel" name="label_79">
               <property name="font">
                <font>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
               <property name="text">
-               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;right&quot;&gt;ΔZ&lt;span style=&quot; vertical-align:sub;&quot;&gt;pv&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;right&quot;&gt;Z&lt;span style=&quot; vertical-align:sub;&quot;&gt;Rayleigh&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
               </property>
              </widget>
             </item>
@@ -3276,13 +3264,13 @@ border:None;</string>
                <bool>false</bool>
               </property>
               <property name="maximum">
-               <number>100</number>
+               <number>200</number>
               </property>
               <property name="pageStep">
-               <number>1</number>
+               <number>0</number>
               </property>
               <property name="value">
-               <number>50</number>
+               <number>100</number>
               </property>
               <property name="orientation">
                <enum>Qt::Horizontal</enum>
@@ -3382,7 +3370,6 @@ border:None;</string>
              <widget class="QLabel" name="label_103">
               <property name="font">
                <font>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -3954,7 +3941,6 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -3971,7 +3957,6 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -4145,7 +4130,6 @@ border:None;</string>
               <widget class="QLabel" name="label_73">
                <property name="font">
                 <font>
-                 <weight>75</weight>
                  <bold>true</bold>
                 </font>
                </property>
@@ -4453,7 +4437,6 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -4470,7 +4453,6 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -5051,7 +5033,6 @@ border:None;</string>
               <widget class="QLabel" name="label_76">
                <property name="font">
                 <font>
-                 <weight>75</weight>
                  <bold>true</bold>
                 </font>
                </property>
@@ -5137,7 +5118,6 @@ border:None;</string>
              <widget class="QLabel" name="label_139">
               <property name="font">
                <font>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -5172,7 +5152,6 @@ border:None;</string>
              <widget class="QLabel" name="label_80">
               <property name="font">
                <font>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -5293,7 +5272,6 @@ border:None;</string>
              <widget class="QLabel" name="label_140">
               <property name="font">
                <font>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -5865,7 +5843,6 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -5882,7 +5859,6 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -6056,7 +6032,6 @@ border:None;</string>
               <widget class="QLabel" name="label_77">
                <property name="font">
                 <font>
-                 <weight>75</weight>
                  <bold>true</bold>
                 </font>
                </property>
@@ -6625,7 +6600,6 @@ border:None;</string>
        </property>
        <property name="font">
         <font>
-         <weight>75</weight>
          <bold>true</bold>
         </font>
        </property>
@@ -6644,7 +6618,6 @@ border:None;</string>
        </property>
        <property name="font">
         <font>
-         <weight>75</weight>
          <bold>true</bold>
         </font>
        </property>
@@ -6663,7 +6636,6 @@ border:None;</string>
        </property>
        <property name="font">
         <font>
-         <weight>75</weight>
          <bold>true</bold>
         </font>
        </property>
@@ -6871,7 +6843,6 @@ QPushButton::enabled{
      <property name="font">
       <font>
        <pointsize>12</pointsize>
-       <weight>75</weight>
        <bold>true</bold>
       </font>
      </property>
@@ -6895,7 +6866,7 @@ QPushButton::pressed{border-style:inset}</string>
      <x>0</x>
      <y>0</y>
      <width>1340</width>
-     <height>21</height>
+     <height>22</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">

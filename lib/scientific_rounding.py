@@ -9,13 +9,11 @@ def error_rounding(value, error):
     decimal_places = 15 # This precision is needed for the values in zscan1.py program
     precision = Decimal(10) ** -decimal_places
 
-    try:
+    if all(item is not None for item in [value,error]):
         val_sign, val_digits, val_exp = Decimal(value).quantize(precision).as_tuple()
         err_sign, err_digits, err_exp = Decimal(error).quantize(precision).as_tuple()
-    except Exception as e:
-        logging.error(traceback.format_exc())
-        print(f"{value=}\n{error=}\n{precision=}")
-        return float(value), float(error), decimal_places
+    else:
+        return value, error, decimal_places
 
     value = Decimal((val_sign, val_digits, val_exp))
     error = Decimal((err_sign, err_digits, err_exp))
