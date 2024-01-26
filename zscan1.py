@@ -27,7 +27,7 @@ from lib.mgmotor import MG17Motor
 from PyQt5 import QtWidgets, uic, QtGui, QtCore
 from PyQt5.QtGui import QPalette, QColor
 from PyQt5.QtWidgets import QFileDialog, QMessageBox, QSlider
-from PyQt5.QtCore import QObject, QThreadPool, QTimer
+from PyQt5.QtCore import QObject, QThreadPool, QTimer, QSettings, QFile
 
 from scipy.signal import medfilt
 from scipy.special import hyp2f1, lambertw
@@ -45,17 +45,52 @@ SOLVENT_T_SLIDER_MAX = 1
 MAX_DPHI0 = 3.142 # maximum DeltaPhi0 for silica (for sliders)
 
 class Window(QtWidgets.QMainWindow):
-
 # INITIALIZATION
-    def __init__(self):
+    def __init__(self, settings):
         super(Window, self).__init__()
-        uic.loadUi(os.path.join(os.path.dirname(__file__), './window.ui'), self)
+        
+        if QFile(settings).exists() and bool(QFile(settings).permissions() & QFile.WriteUser):
+            # if file exists and is writable            
+            self.settings = QSettings(settings, QSettings.IniFormat)
+        else:
+            settings_lines = [
+                "[UI]",
+                fr"ui_path={os.path.join(os.path.dirname(__file__), 'window.ui')}".replace("\\","/"),
+                "[MeasurementTab]",
+                "starting_position=35",
+                "ending_position=75",
+                "step_per_cycle=200",
+                "samples_per_position=200",
+                "[SavingTab]",
+                "silica_thickness=3",
+                fr"main_directory={os.path.join(os.path.dirname(__file__),'data')}".replace("\\","/"),
+                "[FittingTab]",
+                fr"data_directory={os.path.join(os.path.dirname(__file__),'data')}".replace("\\","/"),
+                "silica_thickness=3",
+                "wavelength=800",
+                "zrange=40",
+                "aperture_diameter=1",
+                "distance_from_focus_to_CA=260",
+                fr"solvents_path={os.path.join(os.path.dirname(__file__), 'solvents.json')}".replace("\\","/")
+                ]
+            default_settings_str = '\n'.join(settings_lines)
+            
+            if not QFile("default_settings.ini").exists():
+                # create default settings
+                with open("default_settings.ini", "w") as fi:
+                    fi.write(default_settings_str)
+                os.chmod("default_settings.ini", 0o444) # prevent editing by setting permissions to read-only
+            
+            # create settings file that will be modified
+            with open("settings.ini", "w") as fi:
+                fi.write(default_settings_str)
+            self.settings = QSettings("settings.ini", QSettings.IniFormat)
+                
+        uic.loadUi(self.settings.value('UI/ui_path'), self)
         
         # Additions to UI design
-        #self.path = os.path.join("C:/z-scan/_wyniki/") # default main directory for z-scan data
-        self.path = os.path.join(os.path.dirname(__file__),'data')
-        self.mainDirectory_lineEdit.setText(self.path.replace("/","\\"))
-        self.dataDirectory_lineEdit.setText(self.path.replace("/","\\"))
+        self.mainDirectory_lineEdit.setText(self.settings.value('SavingTab/main_directory').replace("/","\\"))
+        self.dataDirectory_lineEdit.setText(self.settings.value('FittingTab/data_directory').replace("/","\\"))
         
         self.solventOA_absorptionModel_label.setVisible(False)
         self.solventOA_absorptionModel_comboBox.setVisible(False)
@@ -208,6 +243,7 @@ class Window(QtWidgets.QMainWindow):
 
     def clicker_triggers(self):
         # Menu triggers
+        self.actionExit.triggered.connect(self.shutdown)
         self.actionLoadSolvents.triggered.connect(lambda: self.load_solvents(caller="LoadSolvents"))
         self.actionLight.triggered.connect(self.changeSkinLight)
         self.actionDark.triggered.connect(self.changeSkinDark)
@@ -487,6 +523,18 @@ class Window(QtWidgets.QMainWindow):
             self.clearing = False
             
             self.measurement_clear()
+
+# QUITTING THE PROGRAM
+    def shutdown(self):
+        reply = QMessageBox.question(self, 'Window Close', 'Are you sure you want to close the window?', QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+
+        if reply == QMessageBox.Yes:
+            new_settings = dict()
+            self.mainDirectory_lineEdit.setText(self.path.replace("/","\\"))
+            self.dataDirectory_lineEdit.setText(self.path.replace("/","\\"))
+            self.settings.setValue()
+            print('Program exited.')
+            sys.exit()
 
 # DATA ACQUISITION AND DISPLAY
     def measurement_clear(self): # clears all in the first two tabs (Measurement and Data Saving)
@@ -2694,9 +2742,20 @@ class MotorPositioner(QObject):
         window.running = False
         
 if __name__ == '__main__':
-    app = QtWidgets.QApplication(sys.argv)
+    import argparse
+    parser = argparse.ArgumentParser()
+
+    #-db DATABASE -u USERNAME -p PASSWORD -size 20000
+    parser.add_argument("-s",
+                        "--settings",
+                        dest = "settings_ini",
+                        default = f"{os.path.join(os.path.dirname(__file__), 'default_settings.ini')}",
+                        help="Path to settings file (with the filename.*ini)",
+                        type=str)
+    args = parser.parse_args()
     
-    window = Window()
+    app = QtWidgets.QApplication(sys.argv)
+    window = Window(args.settings_ini)
     app.setStyle("Fusion")
     window.default_palette = QtGui.QGuiApplication.palette()
     window.changeSkinDark() # Make sure the additional changes are applied
