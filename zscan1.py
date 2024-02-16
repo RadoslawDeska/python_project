@@ -52,8 +52,8 @@ class Window(QtWidgets.QMainWindow):
         uic.loadUi(os.path.join(os.path.dirname(__file__), './window.ui'), self)
         
         # Additions to UI design
-        #self.path = os.path.join("C:/z-scan/_wyniki/") # default main directory for z-scan data
-        self.path = os.path.join(os.path.dirname(__file__),'data')
+        self.path = os.path.join("C:/z-scan/_wyniki/") # default main directory for z-scan data
+        # self.path = os.path.join(os.path.dirname(__file__),'data')
         self.mainDirectory_lineEdit.setText(self.path.replace("/","\\"))
         self.dataDirectory_lineEdit.setText(self.path.replace("/","\\"))
         
@@ -1120,7 +1120,13 @@ class Window(QtWidgets.QMainWindow):
                         # display error values
                         self.silicaCA_deltaPhi0ErrorSummary_label.setText(f"{self.silicaCA_DPhi0Error:.{self.silicaCA_DPhi0Precision}f}")
                         self.silicaCA_laserIntensityErrorSummary_label.setText(f"{self.laserI0Error*1E-13:.{self.laserI0Precision}f}")
-                        self.silicaCA_beamwaistErrorSummary_label.setText(f"{self.silicaCA_beamwaistError*1E6:.{self.silicaCA_beamwaistPrecision-6}f}")
+                        try:
+                            self.silicaCA_beamwaistErrorSummary_label.setText(f"{self.silicaCA_beamwaistError*1E6:.{self.silicaCA_beamwaistPrecision-6}f}")
+                        except ValueError:
+                            self.silicaCA_beamwaistErrorSummary_label.setText(f"{self.silicaCA_beamwaistError*1E6:.0f}")
+                        except Exception as e:
+                            logging.error(traceback.format_exc())
+                            print("Cannot estimate beamwaist error.")
                         self.silicaCA_rayleighRangeErrorSummary_label.setText(f"{self.silica_rayleighLengthError*1E3:.{self.silica_rayleighLengthPrecision-3}f}")
                         self.numericalApertureErrorSummary_label.setText(f"{self.numericalApertureError:.{self.numericalAperturePrecision}f}")
                     
@@ -1212,9 +1218,13 @@ class Window(QtWidgets.QMainWindow):
                         self.silicaCA_beamwaist, self.silicaCA_beamwaistError, self.silicaCA_beamwaistPrecision = \
                             error_rounding(self.silicaCA_minimizerResult.params['Beamwaist'].value, self.silicaCA_minimizerResult.params['Beamwaist'].stderr)
                         
-                        self.silica_rayleighLengthError = (np.pi/2/self.lda*self.silicaCA_minimizerResult.params['Beamwaist'].value*self.silicaCA_beamwaistError) # [m] Rayleigh length
-                        self.silica_rayleighLength, self.silica_rayleighLengthError, self.silica_rayleighLengthPrecision = \
-                            error_rounding(self.silica_rayleighLength, self.silica_rayleighLengthError)
+                        try:
+                            self.silica_rayleighLengthError = (np.pi/2/self.lda*self.silicaCA_minimizerResult.params['Beamwaist'].value*self.silicaCA_beamwaistError) # [m] Rayleigh length
+                            self.silica_rayleighLength, self.silica_rayleighLengthError, self.silica_rayleighLengthPrecision = \
+                                error_rounding(self.silica_rayleighLength, self.silica_rayleighLengthError)
+                        except Exception as e:
+                            logging.error(traceback.format_exc())
+                            print("Cannot estimate beamwaist error.")
                         
                         self.laserI0Error = self.silicaCA_DPhi0Error*self.lda/(2*np.pi*self.l_silica*self.silica_n2) # [W/m2]
                         self.laserI0, self.laserI0Error, self.laserI0Precision = error_rounding(self.laserI0*1E-13, self.laserI0Error*1E-13) # GW/cm2 (for rounding purpose)
@@ -1222,10 +1232,15 @@ class Window(QtWidgets.QMainWindow):
                         self.laserI0 = self.laserI0*1E13
                         self.laserI0Error = self.laserI0Error*1E13
                         
-                        self.numericalApertureError = self.silicaCA_beamwaistError/self.silica_rayleighLength + \
-                                                      self.silicaCA_beamwaist*self.silica_rayleighLengthError/self.silica_rayleighLength**2
-                        self.numericalAperture, self.numericalApertureError, self.numericalAperturePrecision = \
-                            error_rounding(self.numericalAperture, self.numericalApertureError)
+                        try:
+                            self.numericalApertureError = self.silicaCA_beamwaistError/self.silica_rayleighLength + \
+                                                        self.silicaCA_beamwaist*self.silica_rayleighLengthError/self.silica_rayleighLength**2
+                            self.numericalAperture, self.numericalApertureError, self.numericalAperturePrecision = \
+                                error_rounding(self.numericalAperture, self.numericalApertureError)
+                        except Exception as e:
+                            logging.error(traceback.format_exc())
+                            print("Cannot estimate beamwaist error.")
+                        
             case "Solvent":
                 match from_what:
                     case "from_geometry":
