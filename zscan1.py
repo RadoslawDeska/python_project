@@ -517,7 +517,8 @@ class Window(QtWidgets.QMainWindow):
     def motor_detection_and_homing(self, *args, **kwargs):
         motor_id = 40180184
 
-        import thorlabs_apt as apt
+        from packages import thorlabs_apt as apt # importing it from custom location allows to place APT.dll
+                                                 # in the package directory to read it (it is more user-friendly)
         
         try:
             self.motor = apt.Motor(motor_id)
@@ -527,7 +528,8 @@ class Window(QtWidgets.QMainWindow):
         except:
             print('Motion controller not found!')
             print('Try closing other programs that may be accessing the device.')
-            print('Try re-plugging the USB device and then this program.')
+            print('Try re-plugging the USB device and then run this program.')
+            print(f'If you are simulating the motion controller, make sure Thorlabs APT Server has been configured with the HWSerialNumber {motor_id}')
         
         self.mpositioner = MotorPositioner()
         self.motor.backlash_distance = 0
