@@ -44,27 +44,6 @@ CUVETTE_PATH_LENGTH = 0.001 # [m] path length inside cuvette
 SOLVENT_T_SLIDER_MAX = 1
 MAX_DPHI0 = 3.142 # maximum DeltaPhi0 for silica (for sliders)
 
-
-
-# @Adam notes:
-# 0. stdlib Pathlib  a= Path("solent.json").read_text()
-# 1. Separation of UI frrom computations / domain logic
-#     Data representation (GUI / FE)   ---- API ---- Server logic / BE
-#         REST API (webdev)
-#           HTTP (Method, host, headers, body)
-#               /measurements/{type}/{id}
-#           m = Measurements("somejsonfile.json")
-#            m.get_results(xyz)
-# 2. Common utils
-# 3. linters: black, mypy (typing), ruff
-# 4. Flow -> think in terms of data flow (functional programming)
-
-
-def some_foo(s: str) -> str:
-    return s + "ss"
-
-
-
 # @Adam notes:
 # 0. stdlib Pathlib  a= Path("solent.json").read_text()
 # 1. Separation of UI frrom computations / domain logic
@@ -119,7 +98,7 @@ class Window(QtWidgets.QMainWindow):
                 fr"main_directory={os.path.join(os.path.dirname(__file__),'data')}".replace("\\","/"),
                 "[FittingTab]",
                 fr"data_directory={os.path.join(os.path.dirname(__file__),'data')}".replace("\\","/"),
-                "silica_thickness=3",
+                "silica_thickness=4",
                 "wavelength=800",
                 "zrange=40",
                 "aperture_diameter=1",
@@ -128,16 +107,16 @@ class Window(QtWidgets.QMainWindow):
                 ]
             default_settings_str = '\n'.join(settings_lines)
             
-            if not QFile("default_settings.ini").exists():
+            if not QFile(os.path.join(os.path.dirname(__file__), "default_settings.ini")).exists():
                 # create default settings
-                with open("default_settings.ini", "w") as fi:
+                with open(os.path.join(os.path.dirname(__file__), "default_settings.ini"), "w") as fi:
                     fi.write(default_settings_str)
-                os.chmod("default_settings.ini", 0o444) # prevent editing by setting permissions to read-only
+                os.chmod(os.path.join(os.path.dirname(__file__), "default_settings.ini"), 0o444) # prevent editing by setting permissions to read-only
             
             # create settings file that will be modified
-            with open("settings.ini", "w") as fi:
+            with open(os.path.join(os.path.dirname(__file__), "settings.ini"), "w") as fi:
                 fi.write(default_settings_str)
-            self.settings = QSettings("settings.ini", QSettings.IniFormat)
+            self.settings = QSettings(os.path.join(os.path.dirname(__file__), "settings.ini"), QSettings.IniFormat)
                 
         uic.loadUi(self.settings.value('UI/ui_path'), self)
         
