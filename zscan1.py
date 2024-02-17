@@ -1,40 +1,48 @@
-from datetime import datetime
+"""Z-scan measurement program allows for automated data collection
+from simultaneous measurement of open- and closed-aperture Z-scan traces.
+
+Additionally, the program allows for data analysis by fitting the Z-scan traces
+to theoretical functions developed by Mansoor Sheik-Bahae and Eric van Stryland
+published in \"Characterization Techniques and Tabulations for Organic Nonlinear Materials\"
+M. G. Kuzyk and C. W. Dirk, Eds., page 655-692, Marcel Dekker, Inc., 1998
+"""
+
+__author__ = "Radosław Deska"
+__version__ = '0.1.1'
+
 import json
-from math import factorial
-import nidaqmx
-from nidaqmx import stream_readers
-from nidaqmx.constants import AcquisitionType, Edge
-import numpy as np
-from numpy.typing import NDArray
-from lmfit import Minimizer, Parameters#, fit_report
-import time
+import logging
 import os
 import re
-import winsound
+import sys
+import time
 import traceback
-import logging
+import winsound
+from datetime import datetime
+from math import factorial
+from typing import Tuple
 
 import matplotlib
+import nidaqmx
+import numpy as np
+from lmfit import Minimizer, Parameters  #, fit_report
+from nidaqmx.constants import AcquisitionType, Edge
+from numpy.typing import NDArray
+from PyQt5 import QtCore, QtGui, QtWidgets, uic
+from PyQt5.QtCore import QFile, QFileInfo, QObject, QSettings, QThreadPool, QTimer
+from PyQt5.QtGui import QColor, QPalette
+from PyQt5.QtWidgets import QFileDialog, QMessageBox, QSlider
+from scipy.signal import medfilt
+from scipy.special import hyp2f1
+
+from lib.cursors import BlittedCursor
+from lib.figure import MplCanvas
+from lib.mgmotor import MG17Motor
+from lib.scientific_rounding import error_rounding
+from lib.worker import Worker
+
 matplotlib.rcParams.update({'font.size': 7})
 #from matplotlib.widgets import BlittedCursor
-
-from lib.cursors import BlittedCursor, SnappingCursor
-from lib.figure import MplCanvas
-from lib.worker import Worker
-from lib.scientific_rounding import error_rounding
-from lib.mgmotor import MG17Motor
-
-from PyQt5 import QtWidgets, uic, QtGui, QtCore
-from PyQt5.QtGui import QPalette, QColor
-from PyQt5.QtWidgets import QFileDialog, QMessageBox, QSlider
-from PyQt5.QtCore import QObject, QThreadPool, QTimer, QSettings, QFile
-
-from scipy.signal import medfilt
-from scipy.special import hyp2f1, lambertw
-
-import sys
-
-from typing import Tuple
 
 # CONSTANTS
 SILICA_BETA = 0
@@ -61,6 +69,10 @@ MAX_DPHI0 = 3.142 # maximum DeltaPhi0 for silica (for sliders)
 def some_foo(s: str) -> str:
     return s + "ss"
 
+def apply_settings(w, settings):
+    # Additions to UI design
+    w.mainDirectory_lineEdit.setText(settings.value('SavingTab/main_directory').replace("/","\\"))
+    w.dataDirectory_lineEdit.setText(settings.value('FittingTab/data_directory').replace("/","\\"))
 class Window(QtWidgets.QMainWindow):
 
 # @dataclass
@@ -81,7 +93,8 @@ class Window(QtWidgets.QMainWindow):
     def __init__(self, settings):
         super(Window, self).__init__()
         
-        if QFile(settings).exists() and bool(QFile(settings).permissions() & QFile.WriteUser):
+        info = QFileInfo(settings)
+        if QFile(settings).exists() and bool(info.permissions() & QFile.WriteUser):
             # if file exists and is writable            
             self.settings = QSettings(settings, QSettings.IniFormat)
         else:
@@ -94,7 +107,7 @@ class Window(QtWidgets.QMainWindow):
                 "step_per_cycle=200",
                 "samples_per_position=200",
                 "[SavingTab]",
-                "silica_thickness=3",
+                "silica_thickness=4",
                 fr"main_directory={os.path.join(os.path.dirname(__file__),'data')}".replace("\\","/"),
                 "[FittingTab]",
                 fr"data_directory={os.path.join(os.path.dirname(__file__),'data')}".replace("\\","/"),
@@ -109,20 +122,17 @@ class Window(QtWidgets.QMainWindow):
             
             if not QFile(os.path.join(os.path.dirname(__file__), "default_settings.ini")).exists():
                 # create default settings
-                with open(os.path.join(os.path.dirname(__file__), "default_settings.ini"), "w") as fi:
+                with open(os.path.join(os.path.dirname(__file__), "default_settings.ini"), mode="w", encoding="utf-8") as fi:
                     fi.write(default_settings_str)
                 os.chmod(os.path.join(os.path.dirname(__file__), "default_settings.ini"), 0o444) # prevent editing by setting permissions to read-only
             
             # create settings file that will be modified
-            with open(os.path.join(os.path.dirname(__file__), "settings.ini"), "w") as fi:
+            with open(os.path.join(os.path.dirname(__file__), "settings.ini"), mode="w", encoding="utf-8") as fi:
                 fi.write(default_settings_str)
             self.settings = QSettings(os.path.join(os.path.dirname(__file__), "settings.ini"), QSettings.IniFormat)
                 
         uic.loadUi(self.settings.value('UI/ui_path'), self)
-        
-        # Additions to UI design
-        self.mainDirectory_lineEdit.setText(self.settings.value('SavingTab/main_directory').replace("/","\\"))
-        self.dataDirectory_lineEdit.setText(self.settings.value('FittingTab/data_directory').replace("/","\\"))
+        apply_settings(self,self.settings)
         
         self.solventOA_absorptionModel_label.setVisible(False)
         self.solventOA_absorptionModel_comboBox.setVisible(False)
@@ -155,7 +165,7 @@ class Window(QtWidgets.QMainWindow):
         self.initialized = False
         self.initializing = False # variable for watching if initialize method has been called
         self.running = False # Variable for watching if run method has been called
-        self.silicaCA_fittingLine_drawn = False
+        self.silica_fittingLine_drawn = False
         self.silica_autofit_done = False
         self.solventCA_fittingLine_drawn = False
         self.solventCA_autofit_done = False
@@ -196,35 +206,39 @@ class Window(QtWidgets.QMainWindow):
         # Populate Solvent combobox with data from file
         if caller == "":
             try:
-                json_file = open(os.path.join(os.path.dirname(__file__), 'solvents.json'))
-            
+                with open(os.path.join(os.path.dirname(__file__), 'solvents.json'), mode="r", encoding="utf-8") as json_file:
+                    self.load_and_autocomplete(json_file)
+                
             except FileNotFoundError:
                 self.showdialog('Warning','solvents.json not found in the default location. Select the file.')
                 path = os.path.abspath(os.path.dirname(__file__)) # this is where solvents.json is expected to be
                 file = QFileDialog.getOpenFileName(self, "Open File", path,filter="JSON file (*.json)")
                 if file[0]!='': # if dialog was not cancelled
-                    json_file = open(file[0])
-                else:
-                    json_file = ''
-            
-            finally:
-                if json_file != '':
-                    self.solvents = json.load(json_file)
-                    json_file.close()
-                    self.solventName_comboBox.addItems([key for key in self.solvents.keys()])
-                    self.solvent_autocomplete()
+                    with open(file[0], mode="r", encoding="utf-8") as json_file:
+                        self.load_and_autocomplete(json_file)
             
         elif caller == "LoadSolvents":
             path = os.path.abspath(os.path.dirname(__file__)) # this is where solvents.json is expected to be
             file = QFileDialog.getOpenFileName(self, "Open File", path,filter="JSON file (*.json)")
             if file[0]!='': # if dialog was not cancelled
-                with open(file[0]) as json_file:
-                    self.solvents = json.load(json_file)
-                    json_file.close()
-                    self.solventName_comboBox.addItems([key for key in self.solvents.keys()])
-                    self.solvent_autocomplete()
+                with open(file[0], mode="r", encoding="utf-8") as json_file:
+                    self.load_and_autocomplete(json_file)
             else:
                 return
+
+    def load_and_autocomplete(self, json_file):
+        """
+        The function loads a JSON file containing solvents, populates a combo box with solvent names,
+        and enables autocomplete functionality.
+        
+        :param json_file: The `json_file` parameter in the `load_and_autocomplete` method is expected to
+        be a file object containing solvent data in JSON format. This method reads the JSON data from
+        the file, populates the `self.solvents` attribute with the data, adds the solvent names to a
+        combo box
+        """
+        self.solvents = json.load(json_file)
+        self.solventName_comboBox.addItems([key for key in self.solvents.keys()])
+        self.solvent_autocomplete()
             
     def value_change_triggers(self):
             # Measurement Tab
@@ -236,12 +250,12 @@ class Window(QtWidgets.QMainWindow):
         self.concentration_dataSavingTab_doubleSpinBox.editingFinished.connect(
             lambda: self.concentration_dataSavingTab_doubleSpinBox.setText(
                 self.concentration_dataSavingTab_doubleSpinBox.text()+" %")
-            if not "%" in self.concentration_dataSavingTab_doubleSpinBox.text()
+            if "%" not in self.concentration_dataSavingTab_doubleSpinBox.text()
             else self.concentration_dataSavingTab_doubleSpinBox.text())
         self.wavelength_dataSavingTab_doubleSpinBox.editingFinished.connect(
             lambda: self.wavelength_dataSavingTab_doubleSpinBox.setText(
                 self.wavelength_dataSavingTab_doubleSpinBox.text()+" nm") 
-            if not "nm" in self.wavelength_dataSavingTab_doubleSpinBox.text() 
+            if "nm" not in self.wavelength_dataSavingTab_doubleSpinBox.text() 
             else self.wavelength_dataSavingTab_doubleSpinBox.text())
             
             # Data fitting Tab
@@ -251,15 +265,15 @@ class Window(QtWidgets.QMainWindow):
     def slider_triggers(self):
         # Update display related to the sliders
             # Silica
-        self.slider_fit_manually_connect(self.silicaCA_RayleighLength_slider,"Connect")
-        self.slider_fit_manually_connect(self.silicaCA_centerPoint_slider, "Connect")
-        self.slider_fit_manually_connect(self.silicaCA_zeroLevel_slider, "Connect")
-        self.slider_fit_manually_connect(self.silicaCA_DPhi0_slider, "Connect")
-        # self.silicaCA_RayleighLength_slider.valueChanged.connect(lambda: self.fit_manually(ftype="Silica", stype="CA"))
-        # self.silicaCA_centerPoint_slider.valueChanged.connect(lambda: self.fit_manually(ftype="Silica", stype="CA"))
-        # self.silicaCA_zeroLevel_slider.valueChanged.connect(lambda: self.fit_manually(ftype="Silica", stype="CA"))
-        # self.silicaCA_DPhi0_slider.valueChanged.connect(lambda: self.fit_manually(ftype="Silica", stype="CA"))
-        self.silicaCA_filterSize_slider.valueChanged.connect(lambda: self.reduce_noise_in_data(self.silica_data_set, ftype="Silica", stype="CA"))
+        self.slider_fit_manually_connect(self.silica_RayleighLength_slider,"Connect")
+        self.slider_fit_manually_connect(self.silica_centerPoint_slider, "Connect")
+        self.slider_fit_manually_connect(self.silica_zeroLevel_slider, "Connect")
+        self.slider_fit_manually_connect(self.silica_DPhi0_slider, "Connect")
+        # self.silica_RayleighLength_slider.valueChanged.connect(lambda: self.fit_manually(ftype="Silica", stype="CA"))
+        # self.silica_centerPoint_slider.valueChanged.connect(lambda: self.fit_manually(ftype="Silica", stype="CA"))
+        # self.silica_zeroLevel_slider.valueChanged.connect(lambda: self.fit_manually(ftype="Silica", stype="CA"))
+        # self.silica_DPhi0_slider.valueChanged.connect(lambda: self.fit_manually(ftype="Silica", stype="CA"))
+        self.silica_filterSize_slider.valueChanged.connect(lambda: self.reduce_noise_in_data(self.silica_data_set, ftype="Silica", stype="CA"))
 
             # Solvent
         self.solventCA_RayleighLength_slider.valueChanged.connect(lambda: self.fit_manually(ftype="Solvent", stype="CA"))
@@ -311,8 +325,8 @@ class Window(QtWidgets.QMainWindow):
         self.customConcentration_checkBox.stateChanged.connect(lambda: self.enable_custom('Concentration'))
             
             # Silica CA tab
-        self.silicaCA_fit_pushButton.clicked.connect(lambda: self.fit_automatically(ftype="Silica", stype="CA"))
-        self.silicaCA_fixROI_checkBox.stateChanged.connect(lambda: self.enable_cursors(ftype="Silica", stype="CA"))
+        self.silica_fit_pushButton.clicked.connect(lambda: self.fit_automatically(ftype="Silica", stype="CA"))
+        self.silica_fixROI_checkBox.stateChanged.connect(lambda: self.enable_cursors(ftype="Silica", stype="CA"))
 
             # Solvent CA tab
         self.solventCA_fit_pushButton.clicked.connect(lambda: self.fit_automatically(ftype="Solvent", stype="CA"))
@@ -382,13 +396,13 @@ class Window(QtWidgets.QMainWindow):
 
     def initialize_fitting_charts(self):
         # Silica chart
-        self.silicaCA_figure = MplCanvas(self)
-        self.silicaCA_figure.axes.plot([],[], marker='o', ms=5, linestyle='', color='tab:blue')
-        self.silicaCA_figure.axes.set_title("Silica - closed aperture")
-        self.silicaCA_figure.axes.set_ylabel("Norm. trasmittance")
-        self.silicaCA_figure.axes.set_position([0.135,0.105,.825,.825])
+        self.silica_figure = MplCanvas(self)
+        self.silica_figure.axes.plot([],[], marker='o', ms=5, linestyle='', color='tab:blue')
+        self.silica_figure.axes.set_title("Silica - closed aperture")
+        self.silica_figure.axes.set_ylabel("Norm. trasmittance")
+        self.silica_figure.axes.set_position([0.135,0.105,.825,.825])
         layout_ca_silica = self.silicaCA_layout
-        layout_ca_silica.addWidget(self.silicaCA_figure)
+        layout_ca_silica.addWidget(self.silica_figure)
         
         self.silicaOA_figure = MplCanvas(self)
         self.silicaOA_figure.axes.plot([],[], marker='o', ms=5, linestyle='', color='tab:blue')
@@ -432,22 +446,22 @@ class Window(QtWidgets.QMainWindow):
         layout_oa_sample = self.sampleOA_layout
         layout_oa_sample.addWidget(self.sampleOA_figure)
 
-        self.fitting_charts = {"Silica": {"CA": self.silicaCA_figure, "OA": self.silicaOA_figure},
+        self.fitting_charts = {"Silica": {"CA": self.silica_figure, "OA": self.silicaOA_figure},
                                "Solvent": {"CA": self.solventCA_figure, "OA": self.solventOA_figure},
                                "Sample": {"CA": self.sampleCA_figure, "OA": self.sampleOA_figure}}
         
 # MOTOR NAVIGATION
     def motion_detection(self):
-        if self.initializing == True:
+        if self.initializing is True:
             self.clearLED_pushButton.setEnabled(False)
             self.initLED_pushButton.setEnabled(True)
             self.initialize_pushButton.setEnabled(False)
             self.runLED_pushButton.setEnabled(False)
-        elif self.running == True:
+        elif self.running is True:
             self.clearLED_pushButton.setEnabled(False)
             self.initLED_pushButton.setEnabled(False)
             self.runLED_pushButton.setEnabled(True)
-        elif self.clearing == True:
+        elif self.clearing is True:
             self.clearLED_pushButton.setEnabled(True)
             self.initLED_pushButton.setEnabled(False)
             self.runLED_pushButton.setEnabled(False)
@@ -457,7 +471,7 @@ class Window(QtWidgets.QMainWindow):
             self.runLED_pushButton.setEnabled(False)
 
         if hasattr(self,'motor'):
-            if self.motor.is_in_motion == True:
+            if self.motor.is_in_motion is True:
                 self.clear_pushButton.setEnabled(False)
                 self.run_pushButton.setEnabled(False)
                 self.waitLED_pushButton.setEnabled(True)
@@ -466,7 +480,7 @@ class Window(QtWidgets.QMainWindow):
                 self.samplesStep_spinBox.setEnabled(False)
 
             else:
-                if self.initializing == True:
+                if self.initializing is True:
                     self.clear_pushButton.setEnabled(False)
                     self.run_pushButton.setEnabled(False)
                     self.waitLED_pushButton.setEnabled(True)
@@ -476,7 +490,7 @@ class Window(QtWidgets.QMainWindow):
                     self.stepsScan_spinBox.setEnabled(False)
                     self.samplesStep_spinBox.setEnabled(False)
 
-                elif self.running == True:
+                elif self.running is True:
                     self.clear_pushButton.setEnabled(False)
                     self.run_pushButton.setEnabled(False)
                     self.waitLED_pushButton.setEnabled(True)
@@ -486,7 +500,7 @@ class Window(QtWidgets.QMainWindow):
                     self.stepsScan_spinBox.setEnabled(False)
                     self.samplesStep_spinBox.setEnabled(False)
 
-                elif self.clearing == True:
+                elif self.clearing is True:
                     self.clear_pushButton.setEnabled(False)                    
                     self.run_pushButton.setEnabled(False)
                     self.waitLED_pushButton.setEnabled(True)
@@ -506,7 +520,7 @@ class Window(QtWidgets.QMainWindow):
                     self.stepsScan_spinBox.setEnabled(True)
                     self.samplesStep_spinBox.setEnabled(True)
         
-        if self.data_acquisition_complete == False:
+        if self.data_acquisition_complete is False:
             self.update_pushButton.setEnabled(False)
             self.sendToFit_pushButton.setEnabled(False)
         else:
@@ -515,19 +529,21 @@ class Window(QtWidgets.QMainWindow):
     def motor_detection_and_homing(self, *args, **kwargs):
         motor_id = 40180184
 
-        from packages import thorlabs_apt as apt # importing it from custom location allows to place APT.dll
-                                                 # in the package directory to read it (it is more user-friendly)
+        from packages import thorlabs_apt as apt
+        # importing it from custom location allows to place APT.dll
+        # in the package directory to read it (it is more user-friendly)
         
         try:
             self.motor = apt.Motor(motor_id)
             self.ocx.configure(motor_id)
             print(f'Motor {motor_id} connected')
         
-        except:
-            print('Motion controller not found!')
+        except Exception:
+            logging.error(traceback.format_exc())
             print('Try closing other programs that may be accessing the device.')
             print('Try re-plugging the USB device and then run this program.')
             print(f'If you are simulating the motion controller, make sure Thorlabs APT Server has been configured with the HWSerialNumber {motor_id}')
+            self.showdialog('Error', 'Motion controller not found! For more information, see the console output.')
         
         self.mpositioner = MotorPositioner()
         self.motor.backlash_distance = 0
@@ -560,13 +576,15 @@ class Window(QtWidgets.QMainWindow):
 
 # QUITTING THE PROGRAM
     def shutdown(self):
+        """
+        """        
         reply = QMessageBox.question(self, 'Window Close', 'Are you sure you want to close the window?', QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
 
         if reply == QMessageBox.Yes:
-            new_settings = dict()
-            self.mainDirectory_lineEdit.setText(self.path.replace("/","\\"))
-            self.dataDirectory_lineEdit.setText(self.path.replace("/","\\"))
-            self.settings.setValue()
+            # new_settings = dict()
+            # self.mainDirectory_lineEdit.setText(self.path.replace("/","\\"))
+            # self.dataDirectory_lineEdit.setText(self.path.replace("/","\\"))
+            # self.settings.setValue()
             print('Program exited.')
             sys.exit()
 
@@ -615,7 +633,7 @@ class Window(QtWidgets.QMainWindow):
             
             case _: # if the who_called value is any of the values in the list of "Focus At" dropdown OR "ANYTHING ELSE"
                 
-                if self.initialized == False: # prevent the problem of accessing data for rescale when there is no data created yet.
+                if self.initialized is False: # prevent the problem of accessing data for rescale when there is no data created yet.
                     return
                 
                 called_by = self.focusAt_comboBox.currentText()
@@ -698,7 +716,7 @@ class Window(QtWidgets.QMainWindow):
 
 # DATA SAVING
     def data_reverse(self):
-        if self.where_to_start == "end":# and self.data_reversed == False:
+        if self.where_to_start == "end":# and self.data_reversed is False:
             for chan_no in range(self.number_of_channels_used):
                 self.data['absolute'][chan_no] = np.flip(self.data['absolute'][0],axis=0)
             #self.data_reversed = True
@@ -735,7 +753,7 @@ class Window(QtWidgets.QMainWindow):
         self.fullLogData_textBrowser.append(raw_log)
 
         # log data
-        if self.data_acquisition_complete == True:
+        if self.data_acquisition_complete is True:
             raw_log_data = np.genfromtxt(raw_log.split('\n'))
             self.data['absolute'] = {0: list(raw_log_data[:,1]), 1: list(raw_log_data[:,2]), 2: list(raw_log_data[:,3])}
             self.data_set = list(raw_log_data[:,0]), self.data["absolute"][0], self.data["absolute"][1], self.data["absolute"][2]#, data[:,3] not using the last column with zeros
@@ -813,7 +831,8 @@ class Window(QtWidgets.QMainWindow):
             self.data_display(self.data_set, ftype)
 
             self.switch_fitting_to_on_state(ftype)
-            if ftype == 'Silica': self.silica_autofit_done = False # this is to start afresh with fitting
+            if ftype == 'Silica':
+                self.silica_autofit_done = False # this is to start afresh with fitting
 
             self.fit_manually(ftype,stype="CA")
             self.fit_manually(ftype,stype="OA")
@@ -848,7 +867,8 @@ class Window(QtWidgets.QMainWindow):
                 self.data_display(self.data_set, ftype)
 
                 self.switch_fitting_to_on_state(ftype)
-                if ftype == 'Silica': self.silica_autofit_done = False # this is to start afresh with fitting
+                if ftype == 'Silica':
+                    self.silica_autofit_done = False # this is to start afresh with fitting
 
                 self.fit_manually(ftype, stype="CA")
                 self.fit_manually(ftype, stype="OA")
@@ -868,27 +888,27 @@ class Window(QtWidgets.QMainWindow):
                     self.header = []
                     last_header_line = 0
 
-                    for line_no, l in enumerate(file):
+                    for line_no, line in enumerate(file):
                         for match in required_matches:
-                            if re.match(r"\b%s\b" % match, l): # lookup whole words
+                            if re.match(r"\b%s\b" % match, line): # lookup whole words
                                 header_matches[required_matches.index(match)] = True
-                                self.header.append(l.strip())
+                                self.header.append(line.strip())
 
                                 if match == "SNo": # This is the header end beacon
                                     last_header_line = line_no+3
                         
                         opt_matched = 0
                         for opt_match in optional_matches:
-                            if re.match(r"\b%s\b" % opt_match, l): # lookup whole words
+                            if re.match(r"\b%s\b" % opt_match, line): # lookup whole words
                                 header_matches.append(True)
-                                self.header.append(l.strip())
+                                self.header.append(line.strip())
                                 opt_matched += 1
                     
                     if len(self.header) != 0:
                         if last_header_line != 0: # if the header end beacon was found
                             self.header_correct = all(header_matches[:-(1+opt_matched)]) # check if required matches are satisfied
                             
-                            if self.header_correct == False:
+                            if self.header_correct is False:
                                 self.showdialog('Warning',
                                 ('Header corrupted!\n\n'
                                 'Some parameters might have been loaded improperly.\n\nPut measurement parameters manually.'))
@@ -926,37 +946,37 @@ class Window(QtWidgets.QMainWindow):
         """        
         match o:
             case 'ApertureDiameter':
-                if self.customApertureDiameter_checkBox.isChecked() == True:
+                if self.customApertureDiameter_checkBox.isChecked() is True:
                     self.apertureDiameter_doubleSpinBox.setReadOnly(False)
                 else:
                     self.apertureDiameter_doubleSpinBox.setReadOnly(True)
             case 'ApertureDistance':
-                if self.customApertureToFocusDistance_checkBox.isChecked() == True:
+                if self.customApertureToFocusDistance_checkBox.isChecked() is True:
                     self.apertureToFocusDistance_doubleSpinBox.setReadOnly(False)
                 else:
                     self.apertureToFocusDistance_doubleSpinBox.setReadOnly(True)
             case 'SilicaThickness': 
-                if self.customSilicaThickness_checkBox.isChecked() == True:
+                if self.customSilicaThickness_checkBox.isChecked() is True:
                     self.silicaThickness_dataFittingTab_doubleSpinBox.setReadOnly(False)
                 else:
                     self.silicaThickness_dataFittingTab_doubleSpinBox.setReadOnly(True)
             case 'Wavelength':
-                if self.customWavelength_checkBox.isChecked() == True:
+                if self.customWavelength_checkBox.isChecked() is True:
                     self.wavelength_dataFittingTab_doubleSpinBox.setReadOnly(False)
                 else:
                     self.wavelength_dataFittingTab_doubleSpinBox.setReadOnly(True)
             case 'ZscanRange':
-                if self.customZscanRange_checkBox.isChecked() == True:
+                if self.customZscanRange_checkBox.isChecked() is True:
                     self.zscanRange_doubleSpinBox.setReadOnly(False)
                 else:
                     self.zscanRange_doubleSpinBox.setReadOnly(True)
             case 'Concentration':
-                if self.customConcentration_checkBox.isChecked() == True:
+                if self.customConcentration_checkBox.isChecked() is True:
                     self.concentration_dataFittingTab_doubleSpinBox.setReadOnly(False)
                 else:
                     self.concentration_dataFittingTab_doubleSpinBox.setReadOnly(True)
             case 'SolventBeamwaist':
-                if self.solventCA_customBeamwaist_checkBox.isChecked() == False:
+                if self.solventCA_customBeamwaist_checkBox.isChecked() is False:
                     self.solventCA_RayleighLength_slider.setEnabled(False)
                     if hasattr(window, 'silica_beamwaist'):
                         self.solventCA_RayleighLength_slider.valueChanged.disconnect()
@@ -969,7 +989,7 @@ class Window(QtWidgets.QMainWindow):
                 else:
                     self.solventCA_RayleighLength_slider.setEnabled(True)
             case 'SolventCenterPoint': # OA case
-                if self.solventOA_customCenterPoint_checkBox.isChecked() == False:
+                if self.solventOA_customCenterPoint_checkBox.isChecked() is False:
                     self.solventOA_centerPoint_slider.setEnabled(False)
                     #self.solventOA_centerPoint_doubleSpinBox.setValue(self.solventCA_centerPoint_doubleSpinBox.value())
                 else:
@@ -980,14 +1000,14 @@ class Window(QtWidgets.QMainWindow):
         1) "Disconnect" means current slider should be kept and all others should disconnect from their method
         2) "Connect" means reconnect all sliders to their method'''
         
-        silicaCA_sliders = [self.silicaCA_RayleighLength_slider, self.silicaCA_centerPoint_slider, self.silicaCA_zeroLevel_slider, self.silicaCA_DPhi0_slider]
+        silica_sliders = [self.silica_RayleighLength_slider, self.silica_centerPoint_slider, self.silica_zeroLevel_slider, self.silica_DPhi0_slider]
         #silicaOA_sliders = [self.silicaOA_deltaZpv_slider, self.silicaOA_centerPoint_slider, self.silicaOA_zeroLevel_slider, self.silicaOA_deltaTpv_slider]
         #solventCA_sliders = [self.solventCA_RayleighLength_slider, self.solventCA_centerPoint_slider, self.solventCA_zeroLevel_slider, self.solventCA_DPhi0_slider]
         #solventOA_sliders = [self.solventOA_deltaZpv_slider, self.solventOA_centerPoint_slider, self.solventOA_zeroLevel_slider, self.solventOA_deltaTpv_slider]
         #sampleCA_sliders = [self.sampleCA_deltaZpv_slider, self.sampleCA_centerPoint_slider, self.sampleCA_zeroLevel_slider, self.sampleCA_deltaTpv_slider]
         #sampleOA_sliders = [self.sampleOA_deltaZpv_slider, self.sampleOA_centerPoint_slider, self.sampleOA_zeroLevel_slider, self.sampleOA_deltaTpv_slider]
         
-        available_sliders = [silicaCA_sliders]#, silicaOA_sliders, solventCA_sliders, solventOA_sliders, sampleCA_sliders, sampleOA_sliders]
+        available_sliders = [silica_sliders]#, silicaOA_sliders, solventCA_sliders, solventOA_sliders, sampleCA_sliders, sampleOA_sliders]
         self.disconnected_sliders = "All"
             
         match mode:
@@ -997,14 +1017,14 @@ class Window(QtWidgets.QMainWindow):
                         sliders.remove(current_slider)
                         for s in sliders:
                             s.disconnect()
-                            self.disconnected_sliders = "silicaCA"
+                            self.disconnected_sliders = "silica"
                     
                     except ValueError:
                         pass # If not found
             
             case "Connect":
                 match self.disconnected_sliders:
-                    case "silicaCA":
+                    case "silica":
                         for s in available_sliders[0]:
                             s.valueChanged.connect(lambda: self.fit_manually(ftype="Silica", stype="CA", activated_by=self.disconnected_sliders))
                     case "silicaOA":
@@ -1042,7 +1062,7 @@ class Window(QtWidgets.QMainWindow):
     def toggle_absorption_model(self, ftype):
         match ftype:
             case "Solvent":
-                if self.solventOA_isAbsorption_checkBox.isChecked() == False:
+                if self.solventOA_isAbsorption_checkBox.isChecked() is False:
                     self.solventOA_absorptionModel_label.setVisible(True)
                     self.solventOA_absorptionModel_comboBox.setVisible(True)
                     self.solventOA_fixROI_checkBox.setVisible(True)
@@ -1052,7 +1072,7 @@ class Window(QtWidgets.QMainWindow):
                     self.solventOA_fixROI_checkBox.setVisible(False)
         
             case "Sample":
-                if self.sampleOA_isAbsorption_checkBox.isChecked() == False:
+                if self.sampleOA_isAbsorption_checkBox.isChecked() is False:
                     self.sampleOA_absorptionModel_label.setVisible(True)
                     self.sampleOA_absorptionModel_comboBox.setVisible(True)
                     self.sampleOA_fixROI_checkBox.setVisible(True)
@@ -1064,7 +1084,7 @@ class Window(QtWidgets.QMainWindow):
     def toggle_saturation_model(self, ftype):
         match ftype:
             case "Solvent":
-                if self.solventOA_isAbsorption_checkBox.isChecked() == False:
+                if self.solventOA_isAbsorption_checkBox.isChecked() is False:
                     models = ["SA", "2PA+SA"] #, "RSA"]
                     if self.solventOA_absorptionModel_comboBox.currentText() in models:
                         self.solventOA_saturationModel_label.setVisible(True)
@@ -1073,7 +1093,7 @@ class Window(QtWidgets.QMainWindow):
                         self.solventOA_saturationModel_label.setVisible(False)
                         self.solventOA_saturationModel_comboBox.setVisible(False)
             case "Sample":
-                if self.sampleOA_isAbsorption_checkBox.isChecked() == False:
+                if self.sampleOA_isAbsorption_checkBox.isChecked() is False:
                     models = ["SA", "2PA+SA"] #, "RSA"]
                     if self.sampleOA_absorptionModel_comboBox.currentText() in models:
                         self.sampleOA_saturationModel_label.setVisible(True)
@@ -1085,15 +1105,15 @@ class Window(QtWidgets.QMainWindow):
     def switch_fitting_to_on_state(self, ftype:str):
         match ftype:
             case "Silica":
-                self.silicaCA_RayleighLength_slider.setEnabled(True)
-                self.silicaCA_centerPoint_slider.setEnabled(True)
-                self.silicaCA_zeroLevel_slider.setEnabled(True)
-                self.silicaCA_DPhi0_slider.setEnabled(True)
-                self.silicaCA_fit_pushButton.setEnabled(True)
-                self.silicaCA_filterSize_slider.setEnabled(True)
+                self.silica_RayleighLength_slider.setEnabled(True)
+                self.silica_centerPoint_slider.setEnabled(True)
+                self.silica_zeroLevel_slider.setEnabled(True)
+                self.silica_DPhi0_slider.setEnabled(True)
+                self.silica_fit_pushButton.setEnabled(True)
+                self.silica_filterSize_slider.setEnabled(True)
 
             case "Solvent":
-                if self.solventCA_customBeamwaist_checkBox.isChecked() == True:
+                if self.solventCA_customBeamwaist_checkBox.isChecked() is True:
                     self.solventCA_RayleighLength_slider.setEnabled(True)
                 else:
                     self.solventCA_RayleighLength_slider.setEnabled(False)
@@ -1130,13 +1150,13 @@ class Window(QtWidgets.QMainWindow):
         # DISPLAY VALUES (ALREADY ROUNDED)
         match ftype:
             case "Silica":
-                self.silicaCA_deltaPhi0Summary_doubleSpinBox.setValue(self.silica_DPhi0)
-                self.silicaCA_deltaPhi0Summary_doubleSpinBox.setValue(self.silica_DPhi0)
-                self.silicaCA_laserIntensitySummary_doubleSpinBox.setValue(self.laserI0*1E-13) # [GW/cm2]
-                self.silicaCA_beamwaistSummary_doubleSpinBox.setValue(self.silica_beamwaist*1E6) # [um] radius in focal point
-                self.silicaCA_rayleighRangeSummary_doubleSpinBox.setValue(np.pi*self.silica_beamwaist**2/self.lda*1E3) # [mm]
-                self.silicaCA_beamwaistSummary_doubleSpinBox.setValue(self.silica_beamwaist*1E6) # [um] radius in focal point
-                self.silicaCA_rayleighRangeSummary_doubleSpinBox.setValue(np.pi*self.silica_beamwaist**2/self.lda*1E3) # [mm]
+                self.silica_deltaPhi0Summary_doubleSpinBox.setValue(self.silica_DPhi0)
+                self.silica_deltaPhi0Summary_doubleSpinBox.setValue(self.silica_DPhi0)
+                self.silica_laserIntensitySummary_doubleSpinBox.setValue(self.laserI0*1E-13) # [GW/cm2]
+                self.silica_beamwaistSummary_doubleSpinBox.setValue(self.silica_beamwaist*1E6) # [um] radius in focal point
+                self.silica_rayleighRangeSummary_doubleSpinBox.setValue(np.pi*self.silica_beamwaist**2/self.lda*1E3) # [mm]
+                self.silica_beamwaistSummary_doubleSpinBox.setValue(self.silica_beamwaist*1E6) # [um] radius in focal point
+                self.silica_rayleighRangeSummary_doubleSpinBox.setValue(np.pi*self.silica_beamwaist**2/self.lda*1E3) # [mm]
                 self.numericalAperture_doubleSpinBox.setValue(self.numericalAperture)
                 
             case "Solvent":
@@ -1156,37 +1176,38 @@ class Window(QtWidgets.QMainWindow):
                     # TEMPORARILY DISABLED
                     #self.solventOA_betaSummary_doubleSpinBox.setValue(self.solvent_beta) # CUVETTE_PATH_LENGTH is the solvent/sample thickness assuming no one-photon absorption
         
-            case "Sample": pass
+            case "Sample":
+                pass
 
         if caller == "manual":
             # The errors are unknown until automatic fitting, so set to #.##
             match ftype:
                 case "Silica":
-                    if self.silica_autofit_done == False:
-                        self.silicaCA_deltaPhi0ErrorSummary_label.setText("#.##")
-                        self.silicaCA_laserIntensityErrorSummary_label.setText("#.##")
-                        self.silicaCA_beamwaistErrorSummary_label.setText("#.##")
-                        self.silicaCA_rayleighRangeErrorSummary_label.setText("#.##")
+                    if self.silica_autofit_done is False:
+                        self.silica_deltaPhi0ErrorSummary_label.setText("#.##")
+                        self.silica_laserIntensityErrorSummary_label.setText("#.##")
+                        self.silica_beamwaistErrorSummary_label.setText("#.##")
+                        self.silica_rayleighRangeErrorSummary_label.setText("#.##")
                         self.numericalApertureErrorSummary_label.setText("#.##")
                 case "Solvent":
-                    if self.solventCA_autofit_done == False:
+                    if self.solventCA_autofit_done is False:
                         self.solventCA_deltaPhi0ErrorSummary_label.setText("#.##")
                         self.solventCA_n2ErrorSummary_label.setText("#.##")
                         self.solventOA_n2ErrorSummary_label.setText("#.##")
                         self.solventCA_beamwaistErrorSummary_label.setText("#.##")
                         self.solventCA_rayleighRangeErrorSummary_label.setText("#.##")
-                    # if self.solventOA_autofit_done == False:
+                    # if self.solventOA_autofit_done is False:
                     #     self.solventOA_TErrorSummary_label.setText("#.##")
                     #     self.solventOA_betaErrorSummary_label.setText('#.##')
                     #     self.solventOA_gammaErrorSummary_label.setText('#.##')
                 case "Sample":
-                    if self.sampleCA_autofit_done == False:
+                    if self.sampleCA_autofit_done is False:
                         self.sampleCA_deltaPhi0ErrorSummary_label.setText("#.##")
                         self.sampleCA_n2ErrorSummary_label.setText("#.##")
                         self.sampleOA_n2ErrorSummary_label.setText("#.##")
                         self.sampleCA_beamwaistErrorSummary_label.setText("#.##")
                         self.sampleCA_rayleighRangeErrorSummary_label.setText("#.##")
-                    if self.sampleOA_autofit_done == False:
+                    if self.sampleOA_autofit_done is False:
                         self.sampleOA_TErrorSummary_label.setText("#.##")
                         self.sampleOA_betaErrorSummary_label.setText('#.##')
                         self.sampleOA_gammaErrorSummary_label.setText('#.##')
@@ -1197,22 +1218,22 @@ class Window(QtWidgets.QMainWindow):
                 match ftype:
                     case "Silica":
                         # set display precision
-                        self.silicaCA_deltaPhi0Summary_doubleSpinBox.setDecimals(self.silicaCA_DPhi0Precision)
-                        self.silicaCA_laserIntensitySummary_doubleSpinBox.setDecimals(self.laserI0Precision)
-                        self.silicaCA_beamwaistSummary_doubleSpinBox.setDecimals(self.silicaCA_beamwaistPrecision-6)
-                        self.silicaCA_rayleighRangeSummary_doubleSpinBox.setDecimals(self.silica_rayleighLengthPrecision-3)
+                        self.silica_deltaPhi0Summary_doubleSpinBox.setDecimals(self.silica_DPhi0Precision)
+                        self.silica_laserIntensitySummary_doubleSpinBox.setDecimals(self.laserI0Precision)
+                        self.silica_beamwaistSummary_doubleSpinBox.setDecimals(self.silica_beamwaistPrecision-6)
+                        self.silica_rayleighRangeSummary_doubleSpinBox.setDecimals(self.silica_rayleighLengthPrecision-3)
                         self.numericalAperture_doubleSpinBox.setDecimals(self.numericalAperturePrecision)
                         # display error values
-                        self.silicaCA_deltaPhi0ErrorSummary_label.setText(f"{self.silicaCA_DPhi0Error:.{self.silicaCA_DPhi0Precision}f}")
-                        self.silicaCA_laserIntensityErrorSummary_label.setText(f"{self.laserI0Error*1E-13:.{self.laserI0Precision}f}")
+                        self.silica_deltaPhi0ErrorSummary_label.setText(f"{self.silica_DPhi0Error:.{self.silica_DPhi0Precision}f}")
+                        self.silica_laserIntensityErrorSummary_label.setText(f"{self.laserI0Error*1E-13:.{self.laserI0Precision}f}")
                         try:
-                            self.silicaCA_beamwaistErrorSummary_label.setText(f"{self.silicaCA_beamwaistError*1E6:.{self.silicaCA_beamwaistPrecision-6}f}")
+                            self.silica_beamwaistErrorSummary_label.setText(f"{self.silica_beamwaistError*1E6:.{self.silica_beamwaistPrecision-6}f}")
                         except ValueError:
-                            self.silicaCA_beamwaistErrorSummary_label.setText(f"{self.silicaCA_beamwaistError*1E6:.0f}")
-                        except Exception as e:
+                            self.silica_beamwaistErrorSummary_label.setText(f"{self.silica_beamwaistError*1E6:.0f}")
+                        except Exception:
                             logging.error(traceback.format_exc())
                             print("Cannot estimate beamwaist error.")
-                        self.silicaCA_rayleighRangeErrorSummary_label.setText(f"{self.silica_rayleighLengthError*1E3:.{self.silica_rayleighLengthPrecision-3}f}")
+                        self.silica_rayleighRangeErrorSummary_label.setText(f"{self.silica_rayleighLengthError*1E3:.{self.silica_rayleighLengthPrecision-3}f}")
                         self.numericalApertureErrorSummary_label.setText(f"{self.numericalApertureError:.{self.numericalAperturePrecision}f}")
                     case "Solvent":
                         # solvent n2 precision for float formatting (cannot be negative value)
@@ -1249,11 +1270,13 @@ class Window(QtWidgets.QMainWindow):
                             case "OA":
                                 self.solventOA_n2Summary_doubleSpinBox.setDecimals(self.solvent_n2Precision-9)
                                 self.solventOA_n2ErrorSummary_label.setText(f"{self.solvent_n2Error*1E22:.{solvent_n2ErrorPrecision}f}") # display n2 error in multiples of 10^-9 cm^2/GW
-                    case "Sample": pass
-            except Exception as e:
+                    case "Sample":
+                        pass
+            except Exception:
                 logging.error(traceback.format_exc())
                 self.showdialog('Error', 'The fit didn\'t converge. Errors were not estimated.')
-        else: pass
+        else:
+            pass
 
     def get_general_parameters(self):
         """Gets the values from 'General Parameters' GUI frame and assigns them to variables with basic SI units (mm -> m):\n
@@ -1275,33 +1298,25 @@ class Window(QtWidgets.QMainWindow):
             case "Silica":
                 match from_what:
                     case "from_geometry": # fit_manually
-                        self.silicaCA_zeroLevel = self.silicaCA_zeroLevel_slider.value()/100
-                        self.silicaCA_centerPoint = np.round(self.silicaCA_centerPoint_slider.value()-self.silica_nop/2)
+                        self.silica_zeroLevel = self.silica_zeroLevel_slider.value()/100
+                        self.silica_centerPoint = np.round(self.silica_centerPoint_slider.value()-self.silica_nop/2)
                         if on_data_load:
-                            self.silica_DPhi0, self.silica_beamwaist, self.silica_rayleighLength = \
                             self.silica_DPhi0, self.silica_beamwaist, self.silica_rayleighLength = \
                                 self.params_from_geometry(ftype, "CA")
                         else:
-                            self.silica_DPhi0 = self.silicaCA_DPhi0_slider.value()*MAX_DPHI0/self.silicaCA_DPhi0_slider.maximum()
-                            self.silica_DPhi0 = self.silicaCA_DPhi0_slider.value()*MAX_DPHI0/self.silicaCA_DPhi0_slider.maximum()
-                            self.silica_rayleighLength = self.silicaCA_RayleighLength_slider.value()*self.z_range/2/self.silicaCA_RayleighLength_slider.maximum()
-                            self.silica_beamwaist = np.sqrt(self.silica_rayleighLength*self.lda/np.pi)
+                            self.silica_DPhi0 = self.silica_DPhi0_slider.value()*MAX_DPHI0/self.silica_DPhi0_slider.maximum()
+                            self.silica_rayleighLength = self.silica_RayleighLength_slider.value()*self.z_range/2/self.silica_RayleighLength_slider.maximum()
                             self.silica_beamwaist = np.sqrt(self.silica_rayleighLength*self.lda/np.pi)
                     case "from_autofit": # fit_automatically
-                        self.silicaCA_zeroLevel = self.silicaCA_minimizerResult.params['Zero'].value
-                        self.silicaCA_centerPoint = self.silicaCA_minimizerResult.params['Center'].value
-                        self.silica_DPhi0 = self.silicaCA_minimizerResult.params['DPhi0'].value
-                        self.silica_beamwaist = self.silicaCA_minimizerResult.params['Beamwaist'].value
-                        self.silica_rayleighLength = float(np.pi*self.silica_beamwaist**2/self.lda)
-                        self.silica_DPhi0 = self.silicaCA_minimizerResult.params['DPhi0'].value
-                        self.silica_beamwaist = self.silicaCA_minimizerResult.params['Beamwaist'].value
+                        self.silica_zeroLevel = self.silica_minimizerResult.params['Zero'].value
+                        self.silica_centerPoint = self.silica_minimizerResult.params['Center'].value
+                        self.silica_DPhi0 = self.silica_minimizerResult.params['DPhi0'].value
+                        self.silica_beamwaist = self.silica_minimizerResult.params['Beamwaist'].value
                         self.silica_rayleighLength = float(np.pi*self.silica_beamwaist**2/self.lda)
                 
-                self.laserI0 = self.silica_DPhi0*self.lda/(2*np.pi*self.l_silica*self.silica_n2) # [W/m2]
                 self.laserI0 = self.silica_DPhi0*self.lda/(2*np.pi*self.l_silica*self.silica_n2) # [W/m2]
                 
                 try:
-                    self.numericalAperture = self.silica_beamwaist/self.silica_rayleighLength
                     self.numericalAperture = self.silica_beamwaist/self.silica_rayleighLength
                 except ZeroDivisionError:
                     self.numericalAperture = 0
@@ -1311,41 +1326,29 @@ class Window(QtWidgets.QMainWindow):
                     case "from_geometry": # fit_manually
                         pass # don't calculate errors, they are not known
                     case "from_autofit": # fit_automatically
-                        self.silicaCA_zeroLevel, self.silicaCA_zeroLevelError, self.silicaCA_zeroLevelPrecision = \
-                            error_rounding(self.silicaCA_minimizerResult.params['Zero'].value, self.silicaCA_minimizerResult.params['Zero'].stderr)
-                        self.silicaCA_centerPoint, self.silicaCA_centerPointError, self.silicaCA_centerPointPrecision = \
-                            error_rounding(self.silicaCA_minimizerResult.params['Center'].value, self.silicaCA_minimizerResult.params['Center'].stderr)
-                        self.silica_DPhi0, self.silicaCA_DPhi0Error, self.silicaCA_DPhi0Precision = \
-                        self.silica_DPhi0, self.silicaCA_DPhi0Error, self.silicaCA_DPhi0Precision = \
-                            error_rounding(self.silicaCA_minimizerResult.params['DPhi0'].value, self.silicaCA_minimizerResult.params['DPhi0'].stderr)
-                        self.silica_beamwaist, self.silicaCA_beamwaistError, self.silicaCA_beamwaistPrecision = \
-                        self.silica_beamwaist, self.silicaCA_beamwaistError, self.silicaCA_beamwaistPrecision = \
-                            error_rounding(self.silicaCA_minimizerResult.params['Beamwaist'].value, self.silicaCA_minimizerResult.params['Beamwaist'].stderr)
+                        self.silica_zeroLevel, self.silica_zeroLevelError, self.silica_zeroLevelPrecision = \
+                            error_rounding(self.silica_minimizerResult.params['Zero'].value, self.silica_minimizerResult.params['Zero'].stderr)
+                        self.silica_centerPoint, self.silica_centerPointError, self.silica_centerPointPrecision = \
+                            error_rounding(self.silica_minimizerResult.params['Center'].value, self.silica_minimizerResult.params['Center'].stderr)
+                        self.silica_DPhi0, self.silica_DPhi0Error, self.silica_DPhi0Precision = \
+                            error_rounding(self.silica_minimizerResult.params['DPhi0'].value, self.silica_minimizerResult.params['DPhi0'].stderr)
+                        self.silica_beamwaist, self.silica_beamwaistError, self.silica_beamwaistPrecision = \
+                            error_rounding(self.silica_minimizerResult.params['Beamwaist'].value, self.silica_minimizerResult.params['Beamwaist'].stderr)
                         
-                        try:
-                            self.silica_rayleighLengthError = (np.pi/2/self.lda*self.silicaCA_minimizerResult.params['Beamwaist'].value*self.silicaCA_beamwaistError) # [m] Rayleigh length
-                            self.silica_rayleighLength, self.silica_rayleighLengthError, self.silica_rayleighLengthPrecision = \
-                                error_rounding(self.silica_rayleighLength, self.silica_rayleighLengthError)
-                        except Exception as e:
-                            logging.error(traceback.format_exc())
-                            print("Cannot estimate beamwaist error.")
-                        
-                        self.laserI0Error = self.silicaCA_DPhi0Error*self.lda/(2*np.pi*self.l_silica*self.silica_n2) # [W/m2]
+                        self.silica_rayleighLengthError = (np.pi/2/self.lda*self.silica_minimizerResult.params['Beamwaist'].value*self.silica_beamwaistError) # [m] Rayleigh length
+                        self.silica_rayleighLength, self.silica_rayleighLengthError, self.silica_rayleighLengthPrecision = \
+                            error_rounding(self.silica_rayleighLength, self.silica_rayleighLengthError)
+
+                        self.laserI0Error = self.silica_DPhi0Error*self.lda/(2*np.pi*self.l_silica*self.silica_n2) # [W/m2]
                         self.laserI0, self.laserI0Error, self.laserI0Precision = error_rounding(self.laserI0*1E-13, self.laserI0Error*1E-13) # GW/cm2 (for rounding purpose)
                         # recover original units of W/m2
                         self.laserI0 *= 1E13
                         self.laserI0Error *= 1E13
-                        self.laserI0 *= 1E13
-                        self.laserI0Error *= 1E13
                         
-                        try:
-                            self.numericalApertureError = self.silicaCA_beamwaistError/self.silica_rayleighLength + \
-                                                        self.silicaCA_beamwaist*self.silica_rayleighLengthError/self.silica_rayleighLength**2
-                            self.numericalAperture, self.numericalApertureError, self.numericalAperturePrecision = \
-                                error_rounding(self.numericalAperture, self.numericalApertureError)
-                        except Exception as e:
-                            logging.error(traceback.format_exc())
-                            print("Cannot estimate beamwaist error.")
+                        self.numericalApertureError = self.silica_beamwaistError/self.silica_rayleighLength + \
+                                                    self.silica_beamwaist*self.silica_rayleighLengthError/self.silica_rayleighLength**2
+                        self.numericalAperture, self.numericalApertureError, self.numericalAperturePrecision = \
+                            error_rounding(self.numericalAperture, self.numericalApertureError)
 
             case "Solvent":
                 match stype:
@@ -1362,7 +1365,7 @@ class Window(QtWidgets.QMainWindow):
                                     self.solvent_rayleighLength = self.solventCA_RayleighLength_slider.value()*self.z_range/2/self.solventCA_RayleighLength_slider.maximum()
                                     self.solvent_beamwaist = np.sqrt(self.solvent_rayleighLength*self.lda/np.pi)
                                 
-                                if ftype == "Solvent" and self.solventCA_customBeamwaist_checkBox.isChecked() == False:
+                                if ftype == "Solvent" and self.solventCA_customBeamwaist_checkBox.isChecked() is False:
                                     self.solvent_beamwaist, self.solvent_rayleighLength = self.silica_beamwaist, self.silica_rayleighLength
                             case "from_autofit":
                                 pass
@@ -1381,24 +1384,24 @@ class Window(QtWidgets.QMainWindow):
                                         error_rounding(self.solventCA_minimizerResult.params['Center'].value, self.solventCA_minimizerResult.params['Center'].stderr)
                                     self.solvent_DPhi0, self.solvent_DPhi0Error, self.solvent_DPhi0Precision = \
                                         error_rounding(self.solventCA_minimizerResult.params['DPhi0'].value, self.solventCA_minimizerResult.params['DPhi0'].stderr)
-                                    if self.solventCA_minimizerResult.params['Beamwaist'].vary == True:
+                                    if self.solventCA_minimizerResult.params['Beamwaist'].vary is True:
                                         self.solvent_beamwaist, self.solvent_beamwaistError, self.solvent_beamwaistPrecision = \
                                             error_rounding(self.solventCA_minimizerResult.params['Beamwaist'].value, self.solventCA_minimizerResult.params['Beamwaist'].stderr)
                                     else:
                                         self.solvent_beamwaist, self.solvent_beamwaistError, self.solvent_beamwaistPrecision = \
-                                            self.silica_beamwaist, self.silicaCA_beamwaistError, self.silicaCA_beamwaistPrecision
+                                            self.silica_beamwaist, self.silica_beamwaistError, self.silica_beamwaistPrecision
                                     
                                     self.solvent_rayleighLengthError = (np.pi/2/self.lda*self.solventCA_minimizerResult.params['Beamwaist'].value*self.solvent_beamwaistError) # [m] Rayleigh length
                                     self.solvent_rayleighLength, self.solvent_rayleighLengthError, self.solvent_rayleighLengthPrecision = \
                                         error_rounding(self.solvent_rayleighLength, self.solvent_rayleighLengthError)
                                     
                                     self.solvent_n2Error = self.solvent_DPhi0Error/self.silica_DPhi0*self.silica_n2*self.l_silica/0.001 + \
-                                        self.solvent_DPhi0*self.silicaCA_DPhi0Error/self.silica_DPhi0**2*self.silica_n2*self.l_silica/0.001
+                                        self.solvent_DPhi0*self.silica_DPhi0Error/self.silica_DPhi0**2*self.silica_n2*self.l_silica/0.001
                                     self.solvent_n2, self.solvent_n2Error, self.solvent_n2Precision = error_rounding(self.solvent_n2*1E13, self.solvent_n2Error*1E13)
                                     # recover original units of m2/W
                                     self.solvent_n2 *= 1E-13
                                     self.solvent_n2Error *= 1E-13
-                                except Exception as e:
+                                except Exception:
                                     logging.error(traceback.format_exc())
                                     self.showdialog('Error', 'The fit didn\'t converge. Try using different initial parameters.')
                     case "OA":
@@ -1417,7 +1420,7 @@ class Window(QtWidgets.QMainWindow):
                                     self.solvent_rayleighLength = self.solventCA_RayleighLength_slider.value()*self.z_range/2/self.solventCA_RayleighLength_slider.maximum()
                                     self.solvent_beamwaist = np.sqrt(self.solvent_rayleighLength*self.lda/np.pi)
                                 
-                                if ftype == "Solvent" and self.solventCA_customBeamwaist_checkBox.isChecked() == False:
+                                if ftype == "Solvent" and self.solventCA_customBeamwaist_checkBox.isChecked() is False:
                                     self.solvent_beamwaist, self.solvent_rayleighLength = self.silica_beamwaist, self.silica_rayleighLength
                             case "from_autofit":
                                 pass
@@ -1436,36 +1439,36 @@ class Window(QtWidgets.QMainWindow):
                                         error_rounding(self.solventCA_minimizerResult.params['Center'].value, self.solventCA_minimizerResult.params['Center'].stderr)
                                     self.solvent_DPhi0, self.solvent_DPhi0Error, self.solvent_DPhi0Precision = \
                                         error_rounding(self.solventCA_minimizerResult.params['DPhi0'].value, self.solventCA_minimizerResult.params['DPhi0'].stderr)
-                                    if self.solventCA_minimizerResult.params['Beamwaist'].vary == True:
+                                    if self.solventCA_minimizerResult.params['Beamwaist'].vary is True:
                                         self.solvent_beamwaist, self.solvent_beamwaistError, self.solvent_beamwaistPrecision = \
                                             error_rounding(self.solventCA_minimizerResult.params['Beamwaist'].value, self.solventCA_minimizerResult.params['Beamwaist'].stderr)
                                     else:
                                         self.solvent_beamwaist, self.solvent_beamwaistError, self.solvent_beamwaistPrecision = \
-                                            self.silica_beamwaist, self.silicaCA_beamwaistError, self.silicaCA_beamwaistPrecision
+                                            self.silica_beamwaist, self.silica_beamwaistError, self.silica_beamwaistPrecision
                                     
                                     self.solvent_rayleighLengthError = (np.pi/2/self.lda*self.solventCA_minimizerResult.params['Beamwaist'].value*self.solvent_beamwaistError) # [m] Rayleigh length
                                     self.solvent_rayleighLength, self.solvent_rayleighLengthError, self.solvent_rayleighLengthPrecision = \
                                         error_rounding(self.solvent_rayleighLength, self.solvent_rayleighLengthError)
                                     
                                     self.solvent_n2Error = self.solvent_DPhi0Error/self.silica_DPhi0*self.silica_n2*self.l_silica/0.001 + \
-                                        self.solvent_DPhi0*self.silicaCA_DPhi0Error/self.silica_DPhi0**2*self.silica_n2*self.l_silica/0.001
+                                        self.solvent_DPhi0*self.silica_DPhi0Error/self.silica_DPhi0**2*self.silica_n2*self.l_silica/0.001
                                     self.solvent_n2, self.solvent_n2Error, self.solvent_n2Precision = error_rounding(self.solvent_n2*1E13, self.solvent_n2Error*1E13)
                                     # recover original units of m2/W
                                     self.solvent_n2 *= 1E-13
                                     self.solvent_n2Error *= 1E-13
-                                except Exception as e:
+                                except Exception:
                                     logging.error(traceback.format_exc())
                                     self.showdialog('Error', 'The fit didn\'t converge. Try using different initial parameters.')
                     case "OA":
                         pass
             case "Sample":
-                if self.sampleCA_fittingLine_drawn == True:
+                if self.sampleCA_fittingLine_drawn is True:
                     pass
                 
                 self.sampleCA_zeroLevel = self.sampleCA_zeroLevel_slider.value()/100
                 self.sampleCA_centerPoint = self.sampleCA_centerPoint_slider.value()-50
                 
-                if self.sampleOA_fittingLine_drawn == True:
+                if self.sampleOA_fittingLine_drawn is True:
                     pass
                 
                 self.sampleOA_zeroLevel = self.sampleOA_zeroLevel_slider.value()/100
@@ -1527,16 +1530,16 @@ class Window(QtWidgets.QMainWindow):
             case "Silica":
                 # Silica CA sliders
                 # Because change in slider value triggers the 'fit_manually' method, it has to be disabled.
-                self.silicaCA_RayleighLength_slider.valueChanged.disconnect()
-                self.silicaCA_centerPoint_slider.valueChanged.disconnect()
-                self.silicaCA_zeroLevel_slider.valueChanged.disconnect()
-                self.silicaCA_DPhi0_slider.valueChanged.disconnect()
+                self.silica_RayleighLength_slider.valueChanged.disconnect()
+                self.silica_centerPoint_slider.valueChanged.disconnect()
+                self.silica_zeroLevel_slider.valueChanged.disconnect()
+                self.silica_DPhi0_slider.valueChanged.disconnect()
                 
-                self.silicaCA_RayleighLength_slider.setValue(int(round(self.silica_rayleighLength*self.silicaCA_RayleighLength_slider.maximum()/(self.z_range/2))))
-                self.silicaCA_centerPoint_slider.setValue(int(round(self.silicaCA_centerPoint+self.silicaCA_centerPoint_slider.maximum()/2)))
-                self.silicaCA_zeroLevel_slider.setValue(int(round(self.silicaCA_zeroLevel*100)))
-                self.silicaCA_DPhi0_slider.setValue(int(round(self.silica_DPhi0/np.pi*self.silicaCA_DPhi0_slider.maximum())))
-                self.silicaCA_DPhi0_slider.setValue(int(round(self.silica_DPhi0/np.pi*self.silicaCA_DPhi0_slider.maximum())))
+                self.silica_RayleighLength_slider.setValue(int(round(self.silica_rayleighLength*self.silica_RayleighLength_slider.maximum()/(self.z_range/2))))
+                self.silica_centerPoint_slider.setValue(int(round(self.silica_centerPoint+self.silica_centerPoint_slider.maximum()/2)))
+                self.silica_zeroLevel_slider.setValue(int(round(self.silica_zeroLevel*100)))
+                self.silica_DPhi0_slider.setValue(int(round(self.silica_DPhi0/np.pi*self.silica_DPhi0_slider.maximum())))
+                self.silica_DPhi0_slider.setValue(int(round(self.silica_DPhi0/np.pi*self.silica_DPhi0_slider.maximum())))
 
                 # And now when all is updated by the 'fit_automatically', reconnect the sliders to their slots
                 self.slider_triggers()
@@ -1550,8 +1553,8 @@ class Window(QtWidgets.QMainWindow):
                     self.solventCA_zeroLevel_slider.valueChanged.disconnect()
                     self.solventCA_DPhi0_slider.valueChanged.disconnect()
 
-                    if self.solventCA_customBeamwaist_checkBox.isChecked() == False:
-                        self.solventCA_RayleighLength_slider.setValue(self.silicaCA_RayleighLength_slider.value())
+                    if self.solventCA_customBeamwaist_checkBox.isChecked() is False:
+                        self.solventCA_RayleighLength_slider.setValue(self.silica_RayleighLength_slider.value())
                     else:
                         self.solventCA_RayleighLength_slider.setValue(int(round(self.solvent_rayleighLength*self.solventCA_RayleighLength_slider.maximum()/(self.z_range/2))))
                     self.solventCA_centerPoint_slider.setValue(int(round(self.solventCA_centerPoint+self.solventCA_centerPoint_slider.maximum()/2)))
@@ -1680,13 +1683,13 @@ class Window(QtWidgets.QMainWindow):
         match ftype:
             case "Silica":
                 # Closed aperture
-                line = self.silicaCA_figure.axes.get_lines()[0]
+                line = self.silica_figure.axes.get_lines()[0]
                 line.set_xdata(data_set[0])
                 #line.set_ydata(ca_data)
                 line.set_ydata([ca/oa for ca, oa in zip(data_set[1], data_set[3])])
                 
-                self.silicaCA_figure.axes.set_xlim(left=-self.z_range/2*1000, right=self.z_range/2*1000) # displayed in mm
-                set_limits(self.silicaCA_figure.axes, line, "vertical", padding_vertical)
+                self.silica_figure.axes.set_xlim(left=-self.z_range/2*1000, right=self.z_range/2*1000) # displayed in mm
+                set_limits(self.silica_figure.axes, line, "vertical", padding_vertical)
 
                 # Open aperture
                 line = self.silicaOA_figure.axes.get_lines()[0]
@@ -1698,13 +1701,13 @@ class Window(QtWidgets.QMainWindow):
                 #self.silicaOA_figure.axes.set_ylim(top=np.max(line.get_ydata())*(1+margin_vertical),bottom=np.min(line.get_ydata())*(1-margin_vertical))
                 
                 # Update
-                self.silicaCA_figure.axes.relim()
+                self.silica_figure.axes.relim()
                 self.silicaOA_figure.axes.relim()
                 
-                self.silicaCA_figure.axes.autoscale_view()
+                self.silica_figure.axes.autoscale_view()
                 self.silicaOA_figure.axes.autoscale_view()
                 
-                self.silicaCA_figure.draw_idle()
+                self.silica_figure.draw_idle()
                 self.silicaOA_figure.draw_idle()
             
             case "Solvent":
@@ -1771,7 +1774,7 @@ class Window(QtWidgets.QMainWindow):
         match ftype:
             case "Silica":
                 if stype == "CA":
-                    filter_size = self.silicaCA_filterSize_slider.value()
+                    filter_size = self.silica_filterSize_slider.value()
                 elif stype == "OA":
                     filter_size = self.silicaOA_filterSize_slider.value()
             case "Solvent":
@@ -1785,7 +1788,7 @@ class Window(QtWidgets.QMainWindow):
                 elif stype == "OA":
                     filter_size = self.sampleOA_filterSize_slider.value()
 
-        if (filter_size % 2 == 1 or filter_size == 0) and data_set != None:
+        if (filter_size % 2 == 1 or filter_size == 0) and data_set is not None:
             try:
                 match stype:
                     case "CA":
@@ -1802,12 +1805,12 @@ class Window(QtWidgets.QMainWindow):
                 match ftype:
                     case "Silica":
                         if stype == "CA":
-                            line = self.silicaCA_figure.axes.get_lines()[0]
+                            line = self.silica_figure.axes.get_lines()[0]
                             line.set_ydata(filtered_y)
                             
-                            self.silicaCA_figure.axes.relim()
-                            self.silicaCA_figure.axes.autoscale_view()
-                            self.silicaCA_figure.draw_idle()
+                            self.silica_figure.axes.relim()
+                            self.silica_figure.axes.autoscale_view()
+                            self.silica_figure.draw_idle()
                         elif stype == "OA":
                             pass
                     
@@ -1827,7 +1830,8 @@ class Window(QtWidgets.QMainWindow):
                             self.solventOA_figure.axes.autoscale_view()
                             self.solventOA_figure.draw_idle()
 
-                    case "Sample": pass
+                    case "Sample":
+                        pass
             
             except ValueError:
                 self.showdialog('Error',
@@ -1837,33 +1841,33 @@ class Window(QtWidgets.QMainWindow):
         match ftype:
             case "Silica":
                 if stype == "CA":
-                    if self.silicaCA_fixROI_checkBox.isChecked() == True:
-                        self.silicaCA_cursor_positioner = BlittedCursor(self.silicaCA_figure.axes, color = 'magenta', linewidth = 2)
-                        self.on_mouse_move = self.silicaCA_figure.mpl_connect('motion_notify_event', self.silicaCA_cursor_positioner.on_mouse_move)
-                        self.on_mouse_click = self.silicaCA_figure.mpl_connect('button_press_event', lambda event: self.collect_cursor_clicks(event,ftype))
+                    if self.silica_fixROI_checkBox.isChecked() is True:
+                        self.silica_cursor_positioner = BlittedCursor(self.silica_figure.axes, color = 'magenta', linewidth = 2)
+                        self.on_mouse_move = self.silica_figure.mpl_connect('motion_notify_event', self.silica_cursor_positioner.on_mouse_move)
+                        self.on_mouse_click = self.silica_figure.mpl_connect('button_press_event', lambda event: self.collect_cursor_clicks(event,ftype))
                     else:
                         try:
-                            self.silicaCA_cursor_positioner.vertical_line.remove()
-                            self.silicaCA_cursor_positioner.horizontal_line.remove()
+                            self.silica_cursor_positioner.vertical_line.remove()
+                            self.silica_cursor_positioner.horizontal_line.remove()
                         except (AttributeError, ValueError):
                             print("Specified cross-hair doesn't exist.")
                         finally:
-                            self.silicaCA_figure.mpl_disconnect(self.on_mouse_move)
-                            self.silicaCA_figure.mpl_disconnect(self.on_mouse_click)
-                            self.silicaCA_cursorPositions = []
+                            self.silica_figure.mpl_disconnect(self.on_mouse_move)
+                            self.silica_figure.mpl_disconnect(self.on_mouse_click)
+                            self.silica_cursorPositions = []
                         try:
-                            self.silicaCA_verline1.remove()
-                            self.silicaCA_verline2.remove()
+                            self.silica_verline1.remove()
+                            self.silica_verline2.remove()
                         except (AttributeError, ValueError):
                             print("Specified cross-hair doesn't exist.")
                         finally:
-                            self.silicaCA_figure.draw_idle()
+                            self.silica_figure.draw_idle()
                     
                 elif stype == "OA":
                     pass
             case "Solvent":
                 if stype == "CA":
-                    if self.solventCA_fixROI_checkBox.isChecked() == True:
+                    if self.solventCA_fixROI_checkBox.isChecked() is True:
                         self.solventCA_cursor_positioner = BlittedCursor(self.solventCA_figure.axes, color = 'magenta', linewidth = 2)
                         self.on_mouse_move = self.solventCA_figure.mpl_connect('motion_notify_event', self.solventCA_cursor_positioner.on_mouse_move)
                         self.on_mouse_click = self.solventCA_figure.mpl_connect('button_press_event', lambda event: self.collect_cursor_clicks(event,ftype,stype))
@@ -1886,7 +1890,7 @@ class Window(QtWidgets.QMainWindow):
                             self.solventCA_figure.draw_idle()
                 
                 elif stype == "OA":
-                    if self.solventOA_fixROI_checkBox.isChecked() == True:
+                    if self.solventOA_fixROI_checkBox.isChecked() is True:
                         self.solventOA_cursor_positioner = BlittedCursor(self.solventOA_figure.axes, color = 'magenta', linewidth = 2)
                         self.on_mouse_move = self.solventOA_figure.mpl_connect('motion_notify_event', self.solventOA_cursor_positioner.on_mouse_move)
                         self.on_mouse_click = self.solventOA_figure.mpl_connect('button_press_event', lambda event: self.collect_cursor_clicks(event,ftype,stype))
@@ -1918,21 +1922,21 @@ class Window(QtWidgets.QMainWindow):
         x, y = event.xdata, event.ydata
         match ftype:
             case "Silica":
-                if not hasattr(self, "silicaCA_cursorPositions"):
-                    self.silicaCA_cursorPositions = []
-                if len(self.silicaCA_cursorPositions)<2:
-                    self.silicaCA_cursorPositions.append((x, y))
-                    if len(self.silicaCA_cursorPositions) == 1:
-                        self.silicaCA_verline1 = self.silicaCA_figure.axes.axvline(x, color="orange", linewidth=2)
+                if not hasattr(self, "silica_cursorPositions"):
+                    self.silica_cursorPositions = []
+                if len(self.silica_cursorPositions)<2:
+                    self.silica_cursorPositions.append((x, y))
+                    if len(self.silica_cursorPositions) == 1:
+                        self.silica_verline1 = self.silica_figure.axes.axvline(x, color="orange", linewidth=2)
                     else:
-                        self.silicaCA_verline2 = self.silicaCA_figure.axes.axvline(x, color="orange", linewidth=2)
+                        self.silica_verline2 = self.silica_figure.axes.axvline(x, color="orange", linewidth=2)
                 else:
-                    self.silicaCA_cursorPositions = []
-                    self.silicaCA_cursorPositions.append((x, y))
-                    self.silicaCA_verline1.set_xdata(x)
-                    self.silicaCA_verline2.set_xdata(None)
+                    self.silica_cursorPositions = []
+                    self.silica_cursorPositions.append((x, y))
+                    self.silica_verline1.set_xdata(x)
+                    self.silica_verline2.set_xdata(None)
                 
-                self.silicaCA_figure.draw_idle()
+                self.silica_figure.draw_idle()
             
             case "Solvent":
                 if stype == "CA":
@@ -1969,29 +1973,30 @@ class Window(QtWidgets.QMainWindow):
                     
                     self.solventOA_figure.draw_idle()
             
-            case "Sample": pass
+            case "Sample":
+                pass
 
     def draw_fitting_line(self, ftype:str, stype:str) -> None:
         match ftype:
             case 'Silica':
-                if self.silicaCA_fittingLine_drawn == False:
-                    self.silica_fitting_line_ca, = self.silicaCA_figure.axes.plot(self.silica_data_set[0],self.result,'r')
-                    self.silicaCA_figure.draw_idle()
+                if self.silica_fittingLine_drawn is False:
+                    self.silica_fitting_line_ca, = self.silica_figure.axes.plot(self.silica_data_set[0],self.result,'r')
+                    self.silica_figure.draw_idle()
 
-                    self.silicaCA_fittingLine_drawn = True
+                    self.silica_fittingLine_drawn = True
                 else:
                     if hasattr(self,"silica_data_set"):
                         self.silica_fitting_line_ca.set_xdata(self.silica_data_set[0])
                         self.silica_fitting_line_ca.set_ydata(self.result)
                         
-                        self.silicaCA_figure.axes.set_xlim(left=-self.z_range/2*1000, right=self.z_range/2*1000) # displayed in mm
-                        self.silicaCA_figure.axes.relim()
-                        self.silicaCA_figure.axes.autoscale_view()
-                        self.silicaCA_figure.draw_idle()
+                        self.silica_figure.axes.set_xlim(left=-self.z_range/2*1000, right=self.z_range/2*1000) # displayed in mm
+                        self.silica_figure.axes.relim()
+                        self.silica_figure.axes.autoscale_view()
+                        self.silica_figure.draw_idle()
             
             case 'Solvent':
                 if stype == "CA":
-                    if self.solventCA_fittingLine_drawn == False:
+                    if self.solventCA_fittingLine_drawn is False:
                         self.solvent_fitting_line_ca, = self.solventCA_figure.axes.plot(self.solvent_data_set[0],self.result,'r')
                         self.solventCA_figure.draw_idle()
 
@@ -2007,7 +2012,7 @@ class Window(QtWidgets.QMainWindow):
                             self.solventCA_figure.draw_idle()
                 
                 elif stype == "OA":
-                    if self.solventOA_fittingLine_drawn == False:
+                    if self.solventOA_fittingLine_drawn is False:
                         self.solvent_fitting_line_oa, = self.solventOA_figure.axes.plot(self.solvent_data_set[0],self.result,'r')
                         self.solventOA_figure.draw_idle()
 
@@ -2024,7 +2029,7 @@ class Window(QtWidgets.QMainWindow):
             
             case 'Sample':
                 if stype == "CA":
-                    if self.sampleCA_fittingLine_drawn == False:
+                    if self.sampleCA_fittingLine_drawn is False:
                         self.sample_fitting_line_ca, = self.sampleCA_figure.axes.plot(self.sample_data_set[0],self.result,'r')
                         self.sampleCA_figure.draw_idle()
 
@@ -2040,7 +2045,7 @@ class Window(QtWidgets.QMainWindow):
                             self.sampleCA_figure.draw_idle()
                 
                 elif stype == "OA":
-                    if self.sampleOA_fittingLine_drawn == False:
+                    if self.sampleOA_fittingLine_drawn is False:
                         self.sample_fitting_line_oa, = self.sampleOA_figure.axes.plot(self.sample_data_set[0],self.result,'r')
                         self.sampleOA_figure.draw_idle()
 
@@ -2063,16 +2068,16 @@ class Window(QtWidgets.QMainWindow):
             case "Silica":
                 if stype == "CA":
                     # Datapoints for the curve to be fitted to
-                    line = self.silicaCA_figure.axes.get_lines()[0]
+                    line = self.silica_figure.axes.get_lines()[0]
                 else:
                     return
 
                 line_data = line.get_data()
                 
-                self.silica_calculation = Fitting(self.silica_curves, self.silica_DPhi0, self.silica_beamwaist, self.silicaCA_zeroLevel, self.silicaCA_centerPoint,self.silica_nop,line_data[1])
-                self.silica_calculation = Fitting(self.silica_curves, self.silica_DPhi0, self.silica_beamwaist, self.silicaCA_zeroLevel, self.silicaCA_centerPoint,self.silica_nop,line_data[1])
+                self.silica_calculation = Fitting(self.silica_curves, self.silica_DPhi0, self.silica_beamwaist, self.silica_zeroLevel, self.silica_centerPoint,self.silica_nop,line_data[1])
+                self.silica_calculation = Fitting(self.silica_curves, self.silica_DPhi0, self.silica_beamwaist, self.silica_zeroLevel, self.silica_centerPoint,self.silica_nop,line_data[1])
                 minimizer_result, self.result = self.silica_calculation.automatic(self.z_range, ftype, stype, line_data)
-                self.silicaCA_minimizerResult = minimizer_result
+                self.silica_minimizerResult = minimizer_result
                 self.silica_autofit_done = True
                 self.draw_fitting_line(ftype, stype)
                 self.get_curve_interpretation(ftype,stype,'from_autofit')
@@ -2081,7 +2086,7 @@ class Window(QtWidgets.QMainWindow):
                 self.set_sliders_positions(ftype, stype)
                 
             case "Solvent":
-                if self.silica_autofit_done == False:
+                if self.silica_autofit_done is False:
                     self.showdialog('Info','Fit silica first.')
                     return
                 
@@ -2125,10 +2130,10 @@ class Window(QtWidgets.QMainWindow):
                 # Use these exact number from error-corrected fit parameters to set sliders to their positions
                 self.set_sliders_positions(ftype, stype)
             case "Sample":
-                if self.silica_autofit_done == False:
+                if self.silica_autofit_done is False:
                     self.showdialog('Info','Fit silica first.')
                     
-                    if self.solventCA_autofit_done == False:
+                    if self.solventCA_autofit_done is False:
                         self.showdialog('Info','Fit solvent first.')
                         return
                     else:
@@ -2151,15 +2156,15 @@ class Window(QtWidgets.QMainWindow):
             case "Silica":
                 if stype == "CA":
                     # Datapoints to fit the curve to
-                    line = self.silicaCA_figure.axes.get_lines()[0]
+                    line = self.silica_figure.axes.get_lines()[0]
                     line_data = line.get_ydata()
                     
                     self.silica_curves = Integration(SILICA_BETA,self.silica_n2,self.silica_DPhi0,self.silica_data_set[0],self.d0,self.ra,self.lda,self.silica_beamwaist,N_COMPONENTS,INTEGRATION_STEPS)
-                    self.silica_calculation = Fitting(self.silica_curves, self.silica_DPhi0, self.silica_beamwaist, self.silicaCA_zeroLevel, self.silicaCA_centerPoint,len(self.silica_data_set[0]),line_data)
-                    self.result = self.silica_calculation.manual(self.silicaCA_zeroLevel, self.silicaCA_centerPoint, self.silica_DPhi0, self.silica_beamwaist, self.z_range)
+                    self.silica_calculation = Fitting(self.silica_curves, self.silica_DPhi0, self.silica_beamwaist, self.silica_zeroLevel, self.silica_centerPoint,len(self.silica_data_set[0]),line_data)
+                    self.result = self.silica_calculation.manual(self.silica_zeroLevel, self.silica_centerPoint, self.silica_DPhi0, self.silica_beamwaist, self.z_range)
                     self.silica_curves = Integration(SILICA_BETA,self.silica_n2,self.silica_DPhi0,self.silica_data_set[0],self.d0,self.ra,self.lda,self.silica_beamwaist,N_COMPONENTS,INTEGRATION_STEPS)
-                    self.silica_calculation = Fitting(self.silica_curves, self.silica_DPhi0, self.silica_beamwaist, self.silicaCA_zeroLevel, self.silicaCA_centerPoint,len(self.silica_data_set[0]),line_data)
-                    self.result = self.silica_calculation.manual(self.silicaCA_zeroLevel, self.silicaCA_centerPoint, self.silica_DPhi0, self.silica_beamwaist, self.z_range)
+                    self.silica_calculation = Fitting(self.silica_curves, self.silica_DPhi0, self.silica_beamwaist, self.silica_zeroLevel, self.silica_centerPoint,len(self.silica_data_set[0]),line_data)
+                    self.result = self.silica_calculation.manual(self.silica_zeroLevel, self.silica_centerPoint, self.silica_DPhi0, self.silica_beamwaist, self.z_range)
                     self.silica_autofit_done = False
             case "Solvent":
                 # Data to be fitted
@@ -2205,11 +2210,11 @@ class Window(QtWidgets.QMainWindow):
     def read_header_params(self, caller:str, ftype:str):
         if caller == "Current Measurement":
             # General parameters
-            if self.customWavelength_checkBox.isChecked() == False:
+            if self.customWavelength_checkBox.isChecked() is False:
                 self.wavelength_dataFittingTab_doubleSpinBox.setValue(self.wavelength_dataSavingTab_doubleSpinBox.value())
-            if self.customZscanRange_checkBox.isChecked() == False:
+            if self.customZscanRange_checkBox.isChecked() is False:
                 self.zscanRange_doubleSpinBox.setValue(np.abs(self.endPos_doubleSpinBox.value()-self.startPos_doubleSpinBox.value()))
-            if self.customSilicaThickness_checkBox.isChecked() == False:
+            if self.customSilicaThickness_checkBox.isChecked() is False:
                 self.silicaThickness_dataFittingTab_doubleSpinBox.setValue(self.silicaThickness_dataSavingTab_doubleSpinBox.value())
             
             if ftype == "Sample":
@@ -2224,8 +2229,8 @@ class Window(QtWidgets.QMainWindow):
                         wavelength = float(wavelength_match.groups()[0])
                         self.wavelength_dataFittingTab_doubleSpinBox.setValue(wavelength)
                     
-                    #if ftype == "Silica" and self.customZscanRange_checkBox.isChecked() == False and hl.find("Starting pos") != -1:
-                    if self.customZscanRange_checkBox.isChecked() == False and hl.find("Starting pos") != -1: # read zscanRange for any ftype
+                    #if ftype == "Silica" and self.customZscanRange_checkBox.isChecked() is False and hl.find("Starting pos") != -1:
+                    if self.customZscanRange_checkBox.isChecked() is False and hl.find("Starting pos") != -1: # read zscanRange for any ftype
                         starting_pos_match = re.search(r'(([0-9][0-9]*\.?[0-9]*)|(\.[0-9]+))([Ee][+-]?[0-9]+)?',hl)
                         starting_pos = float(starting_pos_match.groups()[0])
                         next_line = self.header[self.header.index(hl)+1]
@@ -2255,7 +2260,7 @@ class Window(QtWidgets.QMainWindow):
         worker.signals.result.connect(self.print_output)
         worker.signals.finished.connect(self.thread_complete)
 
-        if func_to_execute == self.mpositioner.movetostart:
+        if func_to_execute is self.mpositioner.movetostart:
             worker.signals.progress.connect(self.create_raw_log_line)
 
         # Execute
@@ -2268,17 +2273,17 @@ class Window(QtWidgets.QMainWindow):
         '''
         Message type (msg_type) is one of these: 'Error', 'Warning', 'Info'
         '''
-        args = (msg_type, message)
+        dialog_args = (msg_type, message)
         match msg_type:
             case "Error":
-                button = QMessageBox.critical(self, *args)
+                button = QMessageBox.critical(self, *dialog_args)
             case "Warning":
-                button = QMessageBox.warning(self, *args)
+                button = QMessageBox.warning(self, *dialog_args)
             case "Info":
-                button = QMessageBox.information(self, *args)
+                button = QMessageBox.information(self, *dialog_args)
         
-        #if button == QMessageBox.Ok:
-        #    pass
+        if button == QMessageBox.Ok:
+           pass
 
 # COLOR THEMES
     @QtCore.pyqtSlot()
@@ -2468,18 +2473,22 @@ class Integration():
     def calculate_Tz_for_OA(self, model):
         '''2nd method called. Called by derive() for stype = "OA".'''
         match window.fittingTabs.currentIndex():
-            case 0: ftype = "Silica"
-            case 1: ftype = "Solvent"
-            case 2: ftype = "Sample"
+            case 0:
+                ftype = "Silica"
+            case 1:
+                ftype = "Solvent"
+            case 2:
+                ftype = "Sample"
         
         match ftype:
-            case "Silica": return # Do not fit OA for silica
+            case "Silica":
+                return # Do not fit OA for silica
             case "Solvent":
                 absorption_checkbox = window.solventOA_isAbsorption_checkBox.isChecked()
             case "Sample":
                 absorption_checkbox = window.sampleOA_isAbsorption_checkBox.isChecked()
         
-        if absorption_checkbox == False:
+        if absorption_checkbox is False:
             self.Tz = 0
             # Psi_n = (n * beta_n * I0**n * L_eff)**(1/n) (n+1)-photon absorption
             # Psi1 = T*DPhi0/2/pi
@@ -2644,15 +2653,15 @@ class Fitting():
     def automatic(self, z_range, ftype:str, stype:str, line_xydata):
         self.z_range = z_range
 
-        if (ftype == "Solvent" and window.solventCA_customBeamwaist_checkBox.isChecked() == False):#\
-            #or (ftype == "Sample" and window.sampleCA_customBeamwaist_checkBox.isChecked() == False):
+        if (ftype == "Solvent" and window.solventCA_customBeamwaist_checkBox.isChecked() is False):#\
+            #or (ftype == "Sample" and window.sampleCA_customBeamwaist_checkBox.isChecked() is False):
             vary_beamwaist = False
         else:
             vary_beamwaist = True
         
         vary_centerpoint = True
         if ftype == "Solvent" and stype == "OA":
-            if window.solventOA_customCenterPoint_checkBox.isChecked() == False:
+            if window.solventOA_customCenterPoint_checkBox.isChecked() is False:
                 vary_centerpoint = False
             else:
                 vary_centerpoint = True
@@ -2673,20 +2682,20 @@ class Fitting():
             self.params.add('Zrange', value=self.z_range, vary=False)
         
         if ftype == "Silica":
-            #line = window.silicaCA_figure.axes.get_lines()[0]
+            #line = window.silica_figure.axes.get_lines()[0]
             #xs, ys = line.get_data()
             xs, ys = line_xydata
             weights = np.ones(np.shape(xs))
-            if hasattr(window, 'silicaCA_cursorPositions'):
-                if len(window.silicaCA_cursorPositions) == 2:
+            if hasattr(window, 'silica_cursorPositions'):
+                if len(window.silica_cursorPositions) == 2:
                     # CA ranges for weighting the fit
-                    x1 = window.silicaCA_cursorPositions[0][0]
+                    x1 = window.silica_cursorPositions[0][0]
                     x1_index = list(xs).index(min(xs, key=lambda x:abs(x-x1)))
-                    y1 = window.silicaCA_cursorPositions[0][1]
+                    # y1 = window.silica_cursorPositions[0][1]
                     #y1_index = list(ys).index(min(ys, key=lambda x:abs(x-y1)))
-                    x2 = window.silicaCA_cursorPositions[1][0]
+                    x2 = window.silica_cursorPositions[1][0]
                     x2_index = list(xs).index(min(xs, key=lambda x:abs(x-x2)))
-                    y2 = window.silicaCA_cursorPositions[1][1]
+                    # y2 = window.silica_cursorPositions[1][1]
                     #y2_index = list(ys).index(min(ys, key=lambda x:abs(x-y2)))
                     
                     x_sm, x_lg = sorted([x1_index, x2_index])
@@ -2714,12 +2723,12 @@ class Fitting():
                     # CA ranges for weighting the fit
                     x1 = attribute[0][0]
                     x1_index = list(xs).index(min(xs, key=lambda x:abs(x-x1)))
-                    y1 = attribute[0][1]
-                    y1_index = list(ys).index(min(ys, key=lambda x:abs(x-y1)))
+                    # y1 = attribute[0][1]
+                    # y1_index = list(ys).index(min(ys, key=lambda x:abs(x-y1)))
                     x2 = attribute[1][0]
                     x2_index = list(xs).index(min(xs, key=lambda x:abs(x-x2)))
-                    y2 = attribute[1][1]
-                    y2_index = list(ys).index(min(ys, key=lambda x:abs(x-y2)))
+                    # y2 = attribute[1][1]
+                    # y2_index = list(ys).index(min(ys, key=lambda x:abs(x-y2)))
                     
                     x_sm, x_lg = sorted([x1_index, x2_index])
                     weights = [0 if (xi < x_sm or xi > x_lg) else 1 for xi in range(len(xs))]
@@ -2746,10 +2755,10 @@ class MotorPositioner(QObject):
             window.motor.move_to(end_pos)
             window.where_to_start = "end"
         
-        if window.motor.is_in_motion == True:
+        if window.motor.is_in_motion is True:
             print("Moving to starting position")
         
-        while window.motor.is_in_motion == True:
+        while window.motor.is_in_motion is True:
             continue
 
         self.run(progress_callback)
@@ -2762,7 +2771,7 @@ class MotorPositioner(QObject):
             return
 
         window.motor.move_to(target)
-        while window.motor.is_in_motion == True:
+        while window.motor.is_in_motion is True:
             continue
 
         window.current_pos_chooser.setEnabled(True)
@@ -2774,17 +2783,17 @@ class MotorPositioner(QObject):
         else:
             window.motor.move_by(move_step,blocking=True)
         
-        #while window.motor.is_in_motion == True:
+        #while window.motor.is_in_motion is True:
         #    continue
     
     def movehome(self, *args, **kwargs):
-        if window.motor.has_homing_been_completed == False:
+        if window.motor.has_homing_been_completed is False:
             window.motor.move_home()
          
             time.sleep(0.2) # otherwise it may not move_home()
-            if window.motor.is_in_motion == True:
+            if window.motor.is_in_motion is True:
                 print("Homing now")
-            while window.motor.has_homing_been_completed == False:
+            while window.motor.has_homing_been_completed is False:
                 continue # wait until homing is completed
             time.sleep(0.2) # wait a little more (so the motor.position gets exactly "0" position)
         
@@ -2799,7 +2808,7 @@ class MotorPositioner(QObject):
         nos = window.stepsScan_spinBox.value()
 
         for step in range(nos+1):
-            if window.experiment_stopped == True:
+            if window.experiment_stopped is True:
                 window.experiment_stopped = False
                 window.running = False
                 break
@@ -2881,7 +2890,7 @@ if __name__ == '__main__':
     parser.add_argument("-s",
                         "--settings",
                         dest = "settings_ini",
-                        default = f"{os.path.join(os.path.dirname(__file__), 'default_settings.ini')}",
+                        default = f"{os.path.join(os.path.dirname(__file__), 'settings.ini')}",
                         help="Path to settings file (with the filename.*ini)",
                         type=str)
     args = parser.parse_args()
