@@ -980,7 +980,6 @@ class Window(QtWidgets.QMainWindow):
                 if self.solventCA_customBeamwaist_checkBox.isChecked() == False:
                     self.solventCA_RayleighLength_slider.setEnabled(False)
                     if hasattr(window, 'silica_beamwaist'):
-                    if hasattr(window, 'silica_beamwaist'):
                         self.solventCA_RayleighLength_slider.valueChanged.disconnect()
                         self.solventCA_RayleighLength_slider.setValue(int(round(self.silica_beamwaist*1E6)))
                         self.solventCA_RayleighLength_slider.setValue(int(round(self.silica_beamwaist*1E6)))
@@ -1270,8 +1269,6 @@ class Window(QtWidgets.QMainWindow):
                 logging.error(traceback.format_exc())
                 self.showdialog('Error', 'The fit didn\'t converge. Errors were not estimated.')
         else: pass
-                self.showdialog('Error', 'The fit didn\'t converge. Errors were not estimated.')
-        else: pass
 
     def get_general_parameters(self):
         """Gets the values from 'General Parameters' GUI frame and assigns them to variables with basic SI units (mm -> m):\n
@@ -1353,7 +1350,6 @@ class Window(QtWidgets.QMainWindow):
                         self.laserI0Error *= 1E13
                         
                         self.numericalApertureError = self.silicaCA_beamwaistError/self.silica_rayleighLength + \
-                                                      self.silica_beamwaist*self.silica_rayleighLengthError/self.silica_rayleighLength**2
                                                       self.silica_beamwaist*self.silica_rayleighLengthError/self.silica_rayleighLength**2
                         self.numericalAperture, self.numericalApertureError, self.numericalAperturePrecision = \
                             error_rounding(self.numericalAperture, self.numericalApertureError)
@@ -1563,8 +1559,6 @@ class Window(QtWidgets.QMainWindow):
                     if self.solventCA_customBeamwaist_checkBox.isChecked() == False:
                         self.solventCA_RayleighLength_slider.setValue(self.silicaCA_RayleighLength_slider.value())
                     else:
-                        self.solventCA_RayleighLength_slider.setValue(int(round(self.solvent_rayleighLength*self.solventCA_RayleighLength_slider.maximum()/(self.z_range/2))))
-                    self.solventCA_centerPoint_slider.setValue(int(round(self.solventCA_centerPoint+self.solventCA_centerPoint_slider.maximum()/2)))
                         self.solventCA_RayleighLength_slider.setValue(int(round(self.solvent_rayleighLength*self.solventCA_RayleighLength_slider.maximum()/(self.z_range/2))))
                     self.solventCA_centerPoint_slider.setValue(int(round(self.solventCA_centerPoint+self.solventCA_centerPoint_slider.maximum()/2)))
                     self.solventCA_zeroLevel_slider.setValue(int(round(self.solventCA_zeroLevel*100)))
