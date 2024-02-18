@@ -1001,13 +1001,12 @@ class Window(QtWidgets.QMainWindow):
         2) "Connect" means reconnect all sliders to their method'''
         
         silica_sliders = [self.silica_RayleighLength_slider, self.silica_centerPoint_slider, self.silica_zeroLevel_slider, self.silica_DPhi0_slider]
-        #silicaOA_sliders = [self.silicaOA_deltaZpv_slider, self.silicaOA_centerPoint_slider, self.silicaOA_zeroLevel_slider, self.silicaOA_deltaTpv_slider]
         #solventCA_sliders = [self.solventCA_RayleighLength_slider, self.solventCA_centerPoint_slider, self.solventCA_zeroLevel_slider, self.solventCA_DPhi0_slider]
         #solventOA_sliders = [self.solventOA_deltaZpv_slider, self.solventOA_centerPoint_slider, self.solventOA_zeroLevel_slider, self.solventOA_deltaTpv_slider]
         #sampleCA_sliders = [self.sampleCA_deltaZpv_slider, self.sampleCA_centerPoint_slider, self.sampleCA_zeroLevel_slider, self.sampleCA_deltaTpv_slider]
         #sampleOA_sliders = [self.sampleOA_deltaZpv_slider, self.sampleOA_centerPoint_slider, self.sampleOA_zeroLevel_slider, self.sampleOA_deltaTpv_slider]
         
-        available_sliders = [silica_sliders]#, silicaOA_sliders, solventCA_sliders, solventOA_sliders, sampleCA_sliders, sampleOA_sliders]
+        available_sliders = [silica_sliders]#, solventCA_sliders, solventOA_sliders, sampleCA_sliders, sampleOA_sliders]
         self.disconnected_sliders = "All"
             
         match mode:
