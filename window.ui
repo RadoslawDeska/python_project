@@ -55,6 +55,7 @@
      </property>
      <property name="font">
       <font>
+       <weight>75</weight>
        <bold>true</bold>
       </font>
      </property>
@@ -1213,6 +1214,7 @@ border:None;</string>
        </property>
        <property name="font">
         <font>
+         <weight>75</weight>
          <italic>false</italic>
          <bold>true</bold>
         </font>
@@ -1455,7 +1457,7 @@ border:None;</string>
             <number>125</number>
            </property>
            <property name="pageStep">
-            <number>0</number>
+            <number>1</number>
            </property>
            <property name="value">
             <number>100</number>
@@ -1482,8 +1484,11 @@ border:None;</string>
            <property name="maximum">
             <number>3142</number>
            </property>
+           <property name="singleStep">
+            <number>100</number>
+           </property>
            <property name="pageStep">
-            <number>0</number>
+            <number>100</number>
            </property>
            <property name="value">
             <number>566</number>
@@ -1507,6 +1512,7 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -1523,6 +1529,7 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -1584,8 +1591,11 @@ border:None;</string>
               <property name="maximum">
                <number>200</number>
               </property>
+              <property name="singleStep">
+               <number>3</number>
+              </property>
               <property name="pageStep">
-               <number>0</number>
+               <number>3</number>
               </property>
               <property name="value">
                <number>100</number>
@@ -1599,6 +1609,7 @@ border:None;</string>
              <widget class="QLabel" name="label_44">
               <property name="font">
                <font>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -1621,8 +1632,11 @@ border:None;</string>
               <property name="maximum">
                <number>2000</number>
               </property>
+              <property name="singleStep">
+               <number>10</number>
+              </property>
               <property name="pageStep">
-               <number>0</number>
+               <number>10</number>
               </property>
               <property name="value">
                <number>400</number>
@@ -1639,6 +1653,7 @@ border:None;</string>
              <widget class="QLabel" name="label_45">
               <property name="font">
                <font>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -1664,42 +1679,6 @@ border:None;</string>
            <property name="frameShadow">
             <enum>QFrame::Raised</enum>
            </property>
-           <widget class="QDoubleSpinBox" name="silica_rayleighRangeSummary_doubleSpinBox">
-            <property name="geometry">
-             <rect>
-              <x>10</x>
-              <y>260</y>
-              <width>51</width>
-              <height>31</height>
-             </rect>
-            </property>
-            <property name="font">
-             <font>
-              <pointsize>10</pointsize>
-             </font>
-            </property>
-            <property name="contextMenuPolicy">
-             <enum>Qt::NoContextMenu</enum>
-            </property>
-            <property name="locale">
-             <locale language="English" country="UnitedStates"/>
-            </property>
-            <property name="frame">
-             <bool>false</bool>
-            </property>
-            <property name="alignment">
-             <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-            </property>
-            <property name="readOnly">
-             <bool>true</bool>
-            </property>
-            <property name="buttonSymbols">
-             <enum>QAbstractSpinBox::NoButtons</enum>
-            </property>
-            <property name="maximum">
-             <double>100000000.000000000000000</double>
-            </property>
-           </widget>
            <widget class="QLabel" name="label_50">
             <property name="geometry">
              <rect>
@@ -1716,42 +1695,6 @@ border:None;</string>
             </property>
             <property name="text">
              <string>Beamwaist for silica</string>
-            </property>
-           </widget>
-           <widget class="QDoubleSpinBox" name="silica_laserIntensitySummary_doubleSpinBox">
-            <property name="geometry">
-             <rect>
-              <x>10</x>
-              <y>121</y>
-              <width>51</width>
-              <height>31</height>
-             </rect>
-            </property>
-            <property name="font">
-             <font>
-              <pointsize>10</pointsize>
-             </font>
-            </property>
-            <property name="contextMenuPolicy">
-             <enum>Qt::NoContextMenu</enum>
-            </property>
-            <property name="locale">
-             <locale language="English" country="UnitedStates"/>
-            </property>
-            <property name="frame">
-             <bool>false</bool>
-            </property>
-            <property name="alignment">
-             <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-            </property>
-            <property name="readOnly">
-             <bool>true</bool>
-            </property>
-            <property name="buttonSymbols">
-             <enum>QAbstractSpinBox::NoButtons</enum>
-            </property>
-            <property name="maximum">
-             <double>100000000.000000000000000</double>
             </property>
            </widget>
            <widget class="QLabel" name="label_51">
@@ -1790,66 +1733,6 @@ border:None;</string>
              <string>Laser Intensity</string>
             </property>
            </widget>
-           <widget class="QDoubleSpinBox" name="silica_beamwaistSummary_doubleSpinBox">
-            <property name="geometry">
-             <rect>
-              <x>10</x>
-              <y>190</y>
-              <width>51</width>
-              <height>31</height>
-             </rect>
-            </property>
-            <property name="font">
-             <font>
-              <pointsize>10</pointsize>
-             </font>
-            </property>
-            <property name="contextMenuPolicy">
-             <enum>Qt::NoContextMenu</enum>
-            </property>
-            <property name="locale">
-             <locale language="English" country="UnitedStates"/>
-            </property>
-            <property name="frame">
-             <bool>false</bool>
-            </property>
-            <property name="alignment">
-             <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-            </property>
-            <property name="readOnly">
-             <bool>true</bool>
-            </property>
-            <property name="buttonSymbols">
-             <enum>QAbstractSpinBox::NoButtons</enum>
-            </property>
-            <property name="decimals">
-             <number>1</number>
-            </property>
-            <property name="maximum">
-             <double>100000000.000000000000000</double>
-            </property>
-           </widget>
-           <widget class="QLabel" name="label_53">
-            <property name="geometry">
-             <rect>
-              <x>61</x>
-              <y>121</y>
-              <width>16</width>
-              <height>31</height>
-             </rect>
-            </property>
-            <property name="font">
-             <font>
-              <pointsize>10</pointsize>
-             </font>
-            </property>
-            <property name="text">
-             <string>±</string>
-            </property>
-            <property name="alignment">
-             <set>Qt::AlignCenter</set>
-            </property>
-           </widget>
            <widget class="QLabel" name="label_54">
             <property name="geometry">
              <rect>
@@ -1868,12 +1751,12 @@ border:None;</string>
              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;GW/cm&lt;span style=&quot; vertical-align:super;&quot;&gt;2&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
             </property>
            </widget>
-           <widget class="QLabel" name="silica_laserIntensityErrorSummary_label">
+           <widget class="QLabel" name="silica_laserIntensitySummary_label">
             <property name="geometry">
              <rect>
-              <x>80</x>
+              <x>10</x>
               <y>121</y>
-              <width>41</width>
+              <width>111</width>
               <height>31</height>
              </rect>
             </property>
@@ -1883,18 +1766,18 @@ border:None;</string>
              </font>
             </property>
             <property name="text">
-             <string>#.##</string>
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;0.00 ± #.##&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
             </property>
             <property name="alignment">
-             <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+             <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
             </property>
            </widget>
-           <widget class="QLabel" name="silica_beamwaistErrorSummary_label">
+           <widget class="QLabel" name="silica_beamwaistSummary_label">
             <property name="geometry">
              <rect>
-              <x>80</x>
+              <x>10</x>
               <y>190</y>
-              <width>41</width>
+              <width>111</width>
               <height>31</height>
              </rect>
             </property>
@@ -1904,10 +1787,10 @@ border:None;</string>
              </font>
             </property>
             <property name="text">
-             <string>#.##</string>
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;0.00 ± #.##&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
             </property>
             <property name="alignment">
-             <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+             <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
             </property>
            </widget>
            <widget class="QLabel" name="label_56">
@@ -1928,33 +1811,12 @@ border:None;</string>
              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;μm&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
             </property>
            </widget>
-           <widget class="QLabel" name="label_57">
+           <widget class="QLabel" name="silica_rayleighRangeSummary_label">
             <property name="geometry">
              <rect>
-              <x>60</x>
-              <y>190</y>
-              <width>16</width>
-              <height>31</height>
-             </rect>
-            </property>
-            <property name="font">
-             <font>
-              <pointsize>10</pointsize>
-             </font>
-            </property>
-            <property name="text">
-             <string>±</string>
-            </property>
-            <property name="alignment">
-             <set>Qt::AlignCenter</set>
-            </property>
-           </widget>
-           <widget class="QLabel" name="label_58">
-            <property name="geometry">
-             <rect>
-              <x>60</x>
+              <x>10</x>
               <y>259</y>
-              <width>16</width>
+              <width>111</width>
               <height>31</height>
              </rect>
             </property>
@@ -1964,31 +1826,10 @@ border:None;</string>
              </font>
             </property>
             <property name="text">
-             <string>±</string>
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;0.00 ± #.##&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
             </property>
             <property name="alignment">
-             <set>Qt::AlignCenter</set>
-            </property>
-           </widget>
-           <widget class="QLabel" name="silica_rayleighRangeErrorSummary_label">
-            <property name="geometry">
-             <rect>
-              <x>80</x>
-              <y>259</y>
-              <width>41</width>
-              <height>31</height>
-             </rect>
-            </property>
-            <property name="font">
-             <font>
-              <pointsize>10</pointsize>
-             </font>
-            </property>
-            <property name="text">
-             <string>#.##</string>
-            </property>
-            <property name="alignment">
-             <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+             <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
             </property>
            </widget>
            <widget class="QLabel" name="label_59">
@@ -2045,72 +1886,12 @@ border:None;</string>
              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;rad&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
             </property>
            </widget>
-           <widget class="QLabel" name="silica_deltaPhi0ErrorSummary_label">
-            <property name="geometry">
-             <rect>
-              <x>80</x>
-              <y>51</y>
-              <width>41</width>
-              <height>31</height>
-             </rect>
-            </property>
-            <property name="font">
-             <font>
-              <pointsize>10</pointsize>
-             </font>
-            </property>
-            <property name="text">
-             <string>#.##</string>
-            </property>
-            <property name="alignment">
-             <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
-            </property>
-           </widget>
-           <widget class="QDoubleSpinBox" name="silica_deltaPhi0Summary_doubleSpinBox">
+           <widget class="QLabel" name="silica_deltaPhi0Summary_label">
             <property name="geometry">
              <rect>
               <x>10</x>
               <y>51</y>
-              <width>51</width>
-              <height>31</height>
-             </rect>
-            </property>
-            <property name="font">
-             <font>
-              <pointsize>10</pointsize>
-             </font>
-            </property>
-            <property name="contextMenuPolicy">
-             <enum>Qt::NoContextMenu</enum>
-            </property>
-            <property name="locale">
-             <locale language="English" country="UnitedStates"/>
-            </property>
-            <property name="frame">
-             <bool>false</bool>
-            </property>
-            <property name="alignment">
-             <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-            </property>
-            <property name="readOnly">
-             <bool>true</bool>
-            </property>
-            <property name="buttonSymbols">
-             <enum>QAbstractSpinBox::NoButtons</enum>
-            </property>
-            <property name="decimals">
-             <number>3</number>
-            </property>
-            <property name="maximum">
-             <double>100000000.000000000000000</double>
-            </property>
-           </widget>
-           <widget class="QLabel" name="label_60">
-            <property name="geometry">
-             <rect>
-              <x>61</x>
-              <y>51</y>
-              <width>16</width>
+              <width>111</width>
               <height>31</height>
              </rect>
             </property>
@@ -2120,10 +1901,10 @@ border:None;</string>
              </font>
             </property>
             <property name="text">
-             <string>±</string>
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;0.00 ± #.##&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
             </property>
             <property name="alignment">
-             <set>Qt::AlignCenter</set>
+             <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
             </property>
            </widget>
            <widget class="QLabel" name="label_62">
@@ -2175,54 +1956,12 @@ border:None;</string>
               <string>Numerical aperture of the beam</string>
              </property>
             </widget>
-            <widget class="QLabel" name="numericalApertureErrorSummary_label">
-             <property name="geometry">
-              <rect>
-               <x>80</x>
-               <y>29</y>
-               <width>71</width>
-               <height>31</height>
-              </rect>
-             </property>
-             <property name="font">
-              <font>
-               <pointsize>10</pointsize>
-              </font>
-             </property>
-             <property name="text">
-              <string>#.##</string>
-             </property>
-             <property name="alignment">
-              <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
-             </property>
-            </widget>
-            <widget class="QLabel" name="label_69">
-             <property name="geometry">
-              <rect>
-               <x>60</x>
-               <y>29</y>
-               <width>16</width>
-               <height>31</height>
-              </rect>
-             </property>
-             <property name="font">
-              <font>
-               <pointsize>10</pointsize>
-              </font>
-             </property>
-             <property name="text">
-              <string>±</string>
-             </property>
-             <property name="alignment">
-              <set>Qt::AlignCenter</set>
-             </property>
-            </widget>
-            <widget class="QDoubleSpinBox" name="numericalAperture_doubleSpinBox">
+            <widget class="QLabel" name="numericalApertureSummary_label">
              <property name="geometry">
               <rect>
                <x>10</x>
                <y>30</y>
-               <width>51</width>
+               <width>111</width>
                <height>31</height>
               </rect>
              </property>
@@ -2231,29 +1970,11 @@ border:None;</string>
                <pointsize>10</pointsize>
               </font>
              </property>
-             <property name="contextMenuPolicy">
-              <enum>Qt::NoContextMenu</enum>
-             </property>
-             <property name="locale">
-              <locale language="English" country="UnitedStates"/>
-             </property>
-             <property name="frame">
-              <bool>false</bool>
+             <property name="text">
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;0.00 ± #.##&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
              </property>
              <property name="alignment">
               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-             </property>
-             <property name="readOnly">
-              <bool>true</bool>
-             </property>
-             <property name="buttonSymbols">
-              <enum>QAbstractSpinBox::NoButtons</enum>
-             </property>
-             <property name="decimals">
-              <number>4</number>
-             </property>
-             <property name="maximum">
-              <double>100000000.000000000000000</double>
              </property>
             </widget>
            </widget>
@@ -2344,6 +2065,7 @@ border:None;</string>
               <widget class="QLabel" name="label_67">
                <property name="font">
                 <font>
+                 <weight>75</weight>
                  <bold>true</bold>
                 </font>
                </property>
@@ -2535,6 +2257,7 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -2551,6 +2274,7 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -3131,6 +2855,7 @@ border:None;</string>
               <widget class="QLabel" name="label_74">
                <property name="font">
                 <font>
+                 <weight>75</weight>
                  <bold>true</bold>
                 </font>
                </property>
@@ -3216,6 +2941,7 @@ border:None;</string>
              <widget class="QLabel" name="label_83">
               <property name="font">
                <font>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -3250,6 +2976,7 @@ border:None;</string>
              <widget class="QLabel" name="label_79">
               <property name="font">
                <font>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -3370,6 +3097,7 @@ border:None;</string>
              <widget class="QLabel" name="label_103">
               <property name="font">
                <font>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -3941,6 +3669,7 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -3957,6 +3686,7 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -4130,6 +3860,7 @@ border:None;</string>
               <widget class="QLabel" name="label_73">
                <property name="font">
                 <font>
+                 <weight>75</weight>
                  <bold>true</bold>
                 </font>
                </property>
@@ -4453,6 +4184,7 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -4469,6 +4201,7 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -5049,6 +4782,7 @@ border:None;</string>
               <widget class="QLabel" name="label_76">
                <property name="font">
                 <font>
+                 <weight>75</weight>
                  <bold>true</bold>
                 </font>
                </property>
@@ -5134,6 +4868,7 @@ border:None;</string>
              <widget class="QLabel" name="label_139">
               <property name="font">
                <font>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -5168,6 +4903,7 @@ border:None;</string>
              <widget class="QLabel" name="label_80">
               <property name="font">
                <font>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -5288,6 +5024,7 @@ border:None;</string>
              <widget class="QLabel" name="label_140">
               <property name="font">
                <font>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -5859,6 +5596,7 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -5875,6 +5613,7 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
+                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -6048,6 +5787,7 @@ border:None;</string>
               <widget class="QLabel" name="label_77">
                <property name="font">
                 <font>
+                 <weight>75</weight>
                  <bold>true</bold>
                 </font>
                </property>
@@ -6632,6 +6372,7 @@ border:None;</string>
        </property>
        <property name="font">
         <font>
+         <weight>75</weight>
          <bold>true</bold>
         </font>
        </property>
@@ -6650,6 +6391,7 @@ border:None;</string>
        </property>
        <property name="font">
         <font>
+         <weight>75</weight>
          <bold>true</bold>
         </font>
        </property>
@@ -6668,6 +6410,7 @@ border:None;</string>
        </property>
        <property name="font">
         <font>
+         <weight>75</weight>
          <bold>true</bold>
         </font>
        </property>
@@ -6891,6 +6634,7 @@ QPushButton::enabled{
      <property name="font">
       <font>
        <pointsize>12</pointsize>
+       <weight>75</weight>
        <bold>true</bold>
       </font>
      </property>
@@ -6914,7 +6658,7 @@ QPushButton::pressed{border-style:inset}</string>
      <x>0</x>
      <y>0</y>
      <width>1340</width>
-     <height>22</height>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -7021,10 +6765,6 @@ QPushButton::pressed{border-style:inset}</string>
   <tabstop>silica_DPhi0_slider</tabstop>
   <tabstop>silica_RayleighLength_slider</tabstop>
   <tabstop>silica_fit_pushButton</tabstop>
-  <tabstop>silica_deltaPhi0Summary_doubleSpinBox</tabstop>
-  <tabstop>silica_laserIntensitySummary_doubleSpinBox</tabstop>
-  <tabstop>silica_beamwaistSummary_doubleSpinBox</tabstop>
-  <tabstop>silica_rayleighRangeSummary_doubleSpinBox</tabstop>
   <tabstop>solventAperture_tabWidget</tabstop>
  </tabstops>
  <resources/>

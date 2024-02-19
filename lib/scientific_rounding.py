@@ -1,30 +1,39 @@
-from decimal import *
+from decimal import Decimal, ROUND_UP,ROUND_HALF_UP
 import numpy as np
 import traceback
 import logging
 
+
 # Round value according to uncertainty
 def error_rounding(value, error):
-    decimal_places = 15 # This precision is needed for the values in zscan1.py program
+    print("="*15,f"\nCHECKING VALUE {value}, ERROR {error}")
+    decimal_places = 50 # This precision is needed for the values in zscan1.py program
     precision = Decimal(10) ** -decimal_places
 
-    if all(item is not None for item in [value,error]):
-        val_sign, val_digits, val_exp = Decimal(value).quantize(precision).as_tuple()
-        err_sign, err_digits, err_exp = Decimal(error).quantize(precision).as_tuple()
-    else:
-        return value, error, decimal_places
-
+    # NoneType mitigation
+    if error is None:
+        print('error is None. Changing to decimal.Decimal...')
+        error = Decimal('NaN')
+    
+    # round numbers to given precision
+    val_sign, val_digits, val_exp = Decimal(value).quantize(precision).as_tuple()
+    err_sign, err_digits, err_exp = Decimal(error).quantize(precision).as_tuple()
+    
+    # recreate newly rounded decimals
     value = Decimal((val_sign, val_digits, val_exp))
     error = Decimal((err_sign, err_digits, err_exp))
-
+    
     #print(f'Taking {value} and {error}.')
-
-    try:
-        error_mag = np.floor(error.log10())
-    except Exception as e:
-        logging.error(traceback.format_exc())
-        print(f"{value=}\n{error=}")
-        return float(value), float(error), decimal_places
+    if error != 0:
+        try:
+            error_mag = np.floor(error.log10())
+        except Exception as e:
+            logging.error(traceback.format_exc())
+            print(f"{value=}\n{error=}")
+            return float(value), float(error), decimal_places
+    else:
+        error_mag = 0
+        print(f"{value=}\n{error=}\nError")
     
     #print(f'Magnitude of the error is {error_mag}.')
     
@@ -87,3 +96,7 @@ def error_rounding(value, error):
     _,_, exp = rounded_value.as_tuple()
 
     return float(rounded_value), float(rounded_error), np.abs(exp)
+
+if __name__ == '__main__':
+    for error in [1E-1, 1E-12, 1E-15, 1E12, 1E15, None]:
+        print(error_rounding(1, error))

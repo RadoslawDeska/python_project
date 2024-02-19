@@ -34,11 +34,13 @@ from PyQt5.QtGui import QColor, QPalette
 from PyQt5.QtWidgets import QFileDialog, QMessageBox, QSlider
 from scipy.signal import medfilt
 from scipy.special import hyp2f1
+from sigfig import round as error_rounding
+
 
 from lib.cursors import BlittedCursor
 from lib.figure import MplCanvas
 from lib.mgmotor import MG17Motor
-from lib.scientific_rounding import error_rounding
+# from lib.scientific_rounding import error_rounding
 from lib.worker import Worker
 
 matplotlib.rcParams.update({'font.size': 7})
@@ -131,7 +133,10 @@ class Window(QtWidgets.QMainWindow):
                 fi.write(default_settings_str)
             self.settings = QSettings(os.path.join(os.path.dirname(__file__), "settings.ini"), QSettings.IniFormat)
                 
-        uic.loadUi(self.settings.value('UI/ui_path'), self)
+        try:
+            uic.loadUi(self.settings.value('UI/ui_path'), self)
+        except FileNotFoundError:
+            uic.loadUi('window.ui', self)
         apply_settings(self,self.settings)
         
         self.solventOA_absorptionModel_label.setVisible(False)
@@ -1149,14 +1154,18 @@ class Window(QtWidgets.QMainWindow):
         # DISPLAY VALUES (ALREADY ROUNDED)
         match ftype:
             case "Silica":
-                self.silica_deltaPhi0Summary_doubleSpinBox.setValue(self.silica_DPhi0)
-                self.silica_deltaPhi0Summary_doubleSpinBox.setValue(self.silica_DPhi0)
-                self.silica_laserIntensitySummary_doubleSpinBox.setValue(self.laserI0*1E-13) # [GW/cm2]
-                self.silica_beamwaistSummary_doubleSpinBox.setValue(self.silica_beamwaist*1E6) # [um] radius in focal point
-                self.silica_rayleighRangeSummary_doubleSpinBox.setValue(np.pi*self.silica_beamwaist**2/self.lda*1E3) # [mm]
-                self.silica_beamwaistSummary_doubleSpinBox.setValue(self.silica_beamwaist*1E6) # [um] radius in focal point
-                self.silica_rayleighRangeSummary_doubleSpinBox.setValue(np.pi*self.silica_beamwaist**2/self.lda*1E3) # [mm]
-                self.numericalAperture_doubleSpinBox.setValue(self.numericalAperture)
+                if caller == "auto":
+                    self.silica_deltaPhi0Summary_label.setText(str(self.silica_DPhi0)+' ± '+str(self.silica_DPhi0Error)) # rad
+                    self.silica_laserIntensitySummary_label.setText(str(self.laserI0*1E-13)+' ± '+str(self.laserI0Error*1E-13)) # [GW/cm2]
+                    self.silica_beamwaistSummary_label.setText(str(self.silica_beamwaist*1E6)+' ± '+str(self.silica_beamwaistError*1E6)) # [um] radius in focal point
+                    self.silica_rayleighRangeSummary_label.setText(str(self.silica_rayleighLength*1E3)+' ± '+str(self.silica_rayleighLengthError*1E3)) # [mm]
+                    self.numericalApertureSummary_label.setText(str(self.numericalAperture)+' ± '+str(self.numericalApertureError))
+                else:
+                    self.silica_deltaPhi0Summary_label.setText(str(self.silica_DPhi0)+' ± #.##') # rad
+                    self.silica_laserIntensitySummary_label.setText(str(self.laserI0*1E-13)+' ± #.##') # [GW/cm2]
+                    self.silica_beamwaistSummary_label.setText(str(error_rounding(self.silica_beamwaist*1E6, sigfigs=3, warn=False))+' ± #.##') # [um] radius in focal point
+                    self.silica_rayleighRangeSummary_label.setText(str(self.silica_rayleighLength)+' ± #.##') # [mm]
+                    self.numericalApertureSummary_label.setText(str(self.numericalAperture)+' ± #.##')
                 
             case "Solvent":
                 if stype == "CA":
@@ -1178,105 +1187,6 @@ class Window(QtWidgets.QMainWindow):
             case "Sample":
                 pass
 
-        if caller == "manual":
-            # The errors are unknown until automatic fitting, so set to #.##
-            match ftype:
-                case "Silica":
-                    if self.silica_autofit_done is False:
-                        self.silica_deltaPhi0ErrorSummary_label.setText("#.##")
-                        self.silica_laserIntensityErrorSummary_label.setText("#.##")
-                        self.silica_beamwaistErrorSummary_label.setText("#.##")
-                        self.silica_rayleighRangeErrorSummary_label.setText("#.##")
-                        self.numericalApertureErrorSummary_label.setText("#.##")
-                case "Solvent":
-                    if self.solventCA_autofit_done is False:
-                        self.solventCA_deltaPhi0ErrorSummary_label.setText("#.##")
-                        self.solventCA_n2ErrorSummary_label.setText("#.##")
-                        self.solventOA_n2ErrorSummary_label.setText("#.##")
-                        self.solventCA_beamwaistErrorSummary_label.setText("#.##")
-                        self.solventCA_rayleighRangeErrorSummary_label.setText("#.##")
-                    # if self.solventOA_autofit_done is False:
-                    #     self.solventOA_TErrorSummary_label.setText("#.##")
-                    #     self.solventOA_betaErrorSummary_label.setText('#.##')
-                    #     self.solventOA_gammaErrorSummary_label.setText('#.##')
-                case "Sample":
-                    if self.sampleCA_autofit_done is False:
-                        self.sampleCA_deltaPhi0ErrorSummary_label.setText("#.##")
-                        self.sampleCA_n2ErrorSummary_label.setText("#.##")
-                        self.sampleOA_n2ErrorSummary_label.setText("#.##")
-                        self.sampleCA_beamwaistErrorSummary_label.setText("#.##")
-                        self.sampleCA_rayleighRangeErrorSummary_label.setText("#.##")
-                    if self.sampleOA_autofit_done is False:
-                        self.sampleOA_TErrorSummary_label.setText("#.##")
-                        self.sampleOA_betaErrorSummary_label.setText('#.##')
-                        self.sampleOA_gammaErrorSummary_label.setText('#.##')
-        
-        # ROUND THE NUMBERS AND SET PRECISION OF THE DISPLAYED VALUES
-        elif caller == "auto":
-            try:
-                match ftype:
-                    case "Silica":
-                        # set display precision
-                        self.silica_deltaPhi0Summary_doubleSpinBox.setDecimals(self.silica_DPhi0Precision)
-                        self.silica_laserIntensitySummary_doubleSpinBox.setDecimals(self.laserI0Precision)
-                        self.silica_beamwaistSummary_doubleSpinBox.setDecimals(self.silica_beamwaistPrecision-6)
-                        self.silica_rayleighRangeSummary_doubleSpinBox.setDecimals(self.silica_rayleighLengthPrecision-3)
-                        self.numericalAperture_doubleSpinBox.setDecimals(self.numericalAperturePrecision)
-                        # display error values
-                        self.silica_deltaPhi0ErrorSummary_label.setText(f"{self.silica_DPhi0Error:.{self.silica_DPhi0Precision}f}")
-                        self.silica_laserIntensityErrorSummary_label.setText(f"{self.laserI0Error*1E-13:.{self.laserI0Precision}f}")
-                        try:
-                            self.silica_beamwaistErrorSummary_label.setText(f"{self.silica_beamwaistError*1E6:.{self.silica_beamwaistPrecision-6}f}")
-                        except ValueError:
-                            self.silica_beamwaistErrorSummary_label.setText(f"{self.silica_beamwaistError*1E6:.0f}")
-                        except Exception:
-                            logging.error(traceback.format_exc())
-                            print("Cannot estimate beamwaist error.")
-                        self.silica_rayleighRangeErrorSummary_label.setText(f"{self.silica_rayleighLengthError*1E3:.{self.silica_rayleighLengthPrecision-3}f}")
-                        self.numericalApertureErrorSummary_label.setText(f"{self.numericalApertureError:.{self.numericalAperturePrecision}f}")
-                    case "Solvent":
-                        # solvent n2 precision for float formatting (cannot be negative value)
-                        solvent_n2ErrorPrecision = 0 if self.solvent_n2Precision - 9 < 0 else self.solvent_n2Precision - 9
-                        match stype:
-                            case "CA":
-                                # set display precision
-                                self.solventCA_deltaPhi0Summary_doubleSpinBox.setDecimals(self.solvent_DPhi0Precision)
-                                self.solventCA_n2Summary_doubleSpinBox.setDecimals(self.solvent_n2Precision-9)
-                                self.solventCA_beamwaistSummary_doubleSpinBox.setDecimals(self.solvent_beamwaistPrecision-6)
-                                self.solventCA_rayleighRangeSummary_doubleSpinBox.setDecimals(self.solvent_rayleighLengthPrecision-3)
-                                # display error values
-                                self.solventCA_deltaPhi0ErrorSummary_label.setText(f"{self.solvent_DPhi0Error:.{self.solvent_DPhi0Precision}f}")
-                                self.solventCA_n2ErrorSummary_label.setText(f"{self.solvent_n2Error*1E22:.{solvent_n2ErrorPrecision}f}") # display n2 error in multiples of 10^-9 cm^2/GW
-                                self.solventCA_beamwaistErrorSummary_label.setText(f"{self.solvent_beamwaistError*1E6:.{self.solvent_beamwaistPrecision-6}f}")
-                                self.solventCA_rayleighRangeErrorSummary_label.setText(f"{self.solvent_rayleighLengthError*1E3:.{self.solvent_rayleighLengthPrecision-3}f}")
-                            case "OA":
-                                self.solventOA_n2Summary_doubleSpinBox.setDecimals(self.solvent_n2Precision-9)
-                                self.solventOA_n2ErrorSummary_label.setText(f"{self.solvent_n2Error*1E22:.{solvent_n2ErrorPrecision}f}") # display n2 error in multiples of 10^-9 cm^2/GW
-                        # solvent n2 precision for float formatting (cannot be negative value)
-                        solvent_n2ErrorPrecision = 0 if self.solvent_n2Precision - 9 < 0 else self.solvent_n2Precision - 9
-                        match stype:
-                            case "CA":
-                                # set display precision
-                                self.solventCA_deltaPhi0Summary_doubleSpinBox.setDecimals(self.solvent_DPhi0Precision)
-                                self.solventCA_n2Summary_doubleSpinBox.setDecimals(self.solvent_n2Precision-9)
-                                self.solventCA_beamwaistSummary_doubleSpinBox.setDecimals(self.solvent_beamwaistPrecision-6)
-                                self.solventCA_rayleighRangeSummary_doubleSpinBox.setDecimals(self.solvent_rayleighLengthPrecision-3)
-                                # display error values
-                                self.solventCA_deltaPhi0ErrorSummary_label.setText(f"{self.solvent_DPhi0Error:.{self.solvent_DPhi0Precision}f}")
-                                self.solventCA_n2ErrorSummary_label.setText(f"{self.solvent_n2Error*1E22:.{solvent_n2ErrorPrecision}f}") # display n2 error in multiples of 10^-9 cm^2/GW
-                                self.solventCA_beamwaistErrorSummary_label.setText(f"{self.solvent_beamwaistError*1E6:.{self.solvent_beamwaistPrecision-6}f}")
-                                self.solventCA_rayleighRangeErrorSummary_label.setText(f"{self.solvent_rayleighLengthError*1E3:.{self.solvent_rayleighLengthPrecision-3}f}")
-                            case "OA":
-                                self.solventOA_n2Summary_doubleSpinBox.setDecimals(self.solvent_n2Precision-9)
-                                self.solventOA_n2ErrorSummary_label.setText(f"{self.solvent_n2Error*1E22:.{solvent_n2ErrorPrecision}f}") # display n2 error in multiples of 10^-9 cm^2/GW
-                    case "Sample":
-                        pass
-            except Exception:
-                logging.error(traceback.format_exc())
-                self.showdialog('Error', 'The fit didn\'t converge. Errors were not estimated.')
-        else:
-            pass
-
     def get_general_parameters(self):
         """Gets the values from 'General Parameters' GUI frame and assigns them to variables with basic SI units (mm -> m):\n
         `self.l_silica`, `self.lda`, `self.z_range`, `self.ra`, `self.d0`\n
@@ -1297,6 +1207,12 @@ class Window(QtWidgets.QMainWindow):
             case "Silica":
                 match from_what:
                     case "from_geometry": # fit_manually
+                        # Adjust centerPoint slider (prevent unexpected shifting of the slider and the curve to a side of the plot)
+                        self.silica_centerPoint_slider.setMaximum(self.silica_nop-1)
+                        self.silica_centerPoint_slider.setValue(int(self.silica_nop/2))
+                        self.silica_centerPoint_slider.maximum()
+                        
+                        # read sliders
                         self.silica_zeroLevel = self.silica_zeroLevel_slider.value()/100
                         self.silica_centerPoint = np.round(self.silica_centerPoint_slider.value()-self.silica_nop/2)
                         if on_data_load:
@@ -1323,31 +1239,81 @@ class Window(QtWidgets.QMainWindow):
                 # calculate errors
                 match from_what:
                     case "from_geometry": # fit_manually
-                        pass # don't calculate errors, they are not known
-                    case "from_autofit": # fit_automatically
-                        self.silica_zeroLevel, self.silica_zeroLevelError, self.silica_zeroLevelPrecision = \
-                            error_rounding(self.silica_minimizerResult.params['Zero'].value, self.silica_minimizerResult.params['Zero'].stderr)
-                        self.silica_centerPoint, self.silica_centerPointError, self.silica_centerPointPrecision = \
-                            error_rounding(self.silica_minimizerResult.params['Center'].value, self.silica_minimizerResult.params['Center'].stderr)
-                        self.silica_DPhi0, self.silica_DPhi0Error, self.silica_DPhi0Precision = \
-                            error_rounding(self.silica_minimizerResult.params['DPhi0'].value, self.silica_minimizerResult.params['DPhi0'].stderr)
-                        self.silica_beamwaist, self.silica_beamwaistError, self.silica_beamwaistPrecision = \
-                            error_rounding(self.silica_minimizerResult.params['Beamwaist'].value, self.silica_minimizerResult.params['Beamwaist'].stderr)
+                        self.silica_zeroLevel = error_rounding(
+                                self.silica_zeroLevel,
+                                sigfigs=3, warn=False
+                                )
+                        self.silica_centerPoint = error_rounding(
+                                self.silica_centerPoint,
+                                sigfigs=3, warn=False
+                                )
+                        self.silica_DPhi0 = error_rounding(self.silica_DPhi0, sigfigs=3, warn=False)
                         
-                        self.silica_rayleighLengthError = (np.pi/2/self.lda*self.silica_minimizerResult.params['Beamwaist'].value*self.silica_beamwaistError) # [m] Rayleigh length
-                        self.silica_rayleighLength, self.silica_rayleighLengthError, self.silica_rayleighLengthPrecision = \
-                            error_rounding(self.silica_rayleighLength, self.silica_rayleighLengthError)
+                        self.silica_beamwaist = error_rounding(self.silica_beamwaist, sigfigs=3, warn=False)                            
+                        
+                        # self.silica_rayleighLengthError = \
+                        #     (np.pi/2/self.lda*self.silica_minimizerResult.params['Beamwaist'].value*self.silica_beamwaistError) # [m] Rayleigh length
+                        self.silica_rayleighLength = error_rounding(self.silica_rayleighLength, sigfigs=3, warn=False)
+
+                        # self.laserI0Error = self.silica_DPhi0Error*self.lda/(2*np.pi*self.l_silica*self.silica_n2) # [W/m2]
+                        self.laserI0 = error_rounding(self.laserI0,sigfigs=3, warn=False) # W/m2
+                        
+                        # self.numericalApertureError = self.silica_beamwaistError/self.silica_rayleighLength + \
+                        #     self.silica_beamwaist*self.silica_rayleighLengthError/self.silica_rayleighLength**2
+                        
+                        try:
+                            self.numericalAperture = error_rounding(self.numericalAperture, sigfigs=3, warn=False)
+                        except ValueError:
+                            self.numericalAperture = 0
+                    
+                    case "from_autofit": # fit_automatically
+                        self.silica_zeroLevel, self.silica_zeroLevelError = error_rounding(
+                                self.silica_minimizerResult.params['Zero'].value,
+                                uncertainty=self.silica_minimizerResult.params['Zero'].stderr,
+                                separation=tuple
+                                )
+                        self.silica_centerPoint, self.silica_centerPointError = error_rounding(
+                                self.silica_minimizerResult.params['Center'].value,
+                                uncertainty=self.silica_minimizerResult.params['Center'].stderr,
+                                separation=tuple
+                                )
+                        self.silica_DPhi0, self.silica_DPhi0Error = error_rounding(
+                                self.silica_minimizerResult.params['DPhi0'].value,
+                                uncertainty=self.silica_minimizerResult.params['DPhi0'].stderr,
+                                separation=tuple
+                                )
+                        self.silica_beamwaist, self.silica_beamwaistError = error_rounding(
+                                self.silica_minimizerResult.params['Beamwaist'].value,
+                                uncertainty=self.silica_minimizerResult.params['Beamwaist'].stderr,
+                                separation=tuple
+                                )
+                        
+                        self.silica_rayleighLengthError = \
+                            (np.pi/2/self.lda*self.silica_minimizerResult.params['Beamwaist'].value*self.silica_beamwaistError) # [m] Rayleigh length
+                        self.silica_rayleighLength, self.silica_rayleighLengthError = error_rounding(
+                                self.silica_rayleighLength,
+                                uncertainty=self.silica_rayleighLengthError,
+                                separation=tuple
+                                )
 
                         self.laserI0Error = self.silica_DPhi0Error*self.lda/(2*np.pi*self.l_silica*self.silica_n2) # [W/m2]
-                        self.laserI0, self.laserI0Error, self.laserI0Precision = error_rounding(self.laserI0*1E-13, self.laserI0Error*1E-13) # GW/cm2 (for rounding purpose)
-                        # recover original units of W/m2
-                        self.laserI0 *= 1E13
-                        self.laserI0Error *= 1E13
                         
+                        self.laserI0, self.laserI0Error = error_rounding(
+                            self.laserI0,
+                            uncertainty=self.laserI0Error,
+                            separation=tuple
+                            ) # W/m2
+                        
+
                         self.numericalApertureError = self.silica_beamwaistError/self.silica_rayleighLength + \
-                                                    self.silica_beamwaist*self.silica_rayleighLengthError/self.silica_rayleighLength**2
-                        self.numericalAperture, self.numericalApertureError, self.numericalAperturePrecision = \
-                            error_rounding(self.numericalAperture, self.numericalApertureError)
+                            self.silica_beamwaist*self.silica_rayleighLengthError/self.silica_rayleighLength**2
+                            
+                        if not np.isnan(self.numericalApertureError):
+                            self.numericalAperture, self.numericalApertureError = error_rounding(
+                                self.numericalAperture,
+                                uncertainty=self.numericalApertureError,
+                                separation=tuple
+                                )
 
             case "Solvent":
                 match stype:
@@ -2076,6 +2042,10 @@ class Window(QtWidgets.QMainWindow):
                 self.silica_calculation = Fitting(self.silica_curves, self.silica_DPhi0, self.silica_beamwaist, self.silica_zeroLevel, self.silica_centerPoint,self.silica_nop,line_data[1])
                 self.silica_calculation = Fitting(self.silica_curves, self.silica_DPhi0, self.silica_beamwaist, self.silica_zeroLevel, self.silica_centerPoint,self.silica_nop,line_data[1])
                 minimizer_result, self.result = self.silica_calculation.automatic(self.z_range, ftype, stype, line_data)
+                # Make sure that the result doesn't contain NoneTypes
+                for key in minimizer_result.params.keys():
+                    if minimizer_result.params[key].stderr is None:
+                        minimizer_result.params[key].stderr = 0
                 self.silica_minimizerResult = minimizer_result
                 self.silica_autofit_done = True
                 self.draw_fitting_line(ftype, stype)
@@ -2161,9 +2131,6 @@ class Window(QtWidgets.QMainWindow):
                     self.silica_curves = Integration(SILICA_BETA,self.silica_n2,self.silica_DPhi0,self.silica_data_set[0],self.d0,self.ra,self.lda,self.silica_beamwaist,N_COMPONENTS,INTEGRATION_STEPS)
                     self.silica_calculation = Fitting(self.silica_curves, self.silica_DPhi0, self.silica_beamwaist, self.silica_zeroLevel, self.silica_centerPoint,len(self.silica_data_set[0]),line_data)
                     self.result = self.silica_calculation.manual(self.silica_zeroLevel, self.silica_centerPoint, self.silica_DPhi0, self.silica_beamwaist, self.z_range)
-                    self.silica_curves = Integration(SILICA_BETA,self.silica_n2,self.silica_DPhi0,self.silica_data_set[0],self.d0,self.ra,self.lda,self.silica_beamwaist,N_COMPONENTS,INTEGRATION_STEPS)
-                    self.silica_calculation = Fitting(self.silica_curves, self.silica_DPhi0, self.silica_beamwaist, self.silica_zeroLevel, self.silica_centerPoint,len(self.silica_data_set[0]),line_data)
-                    self.result = self.silica_calculation.manual(self.silica_zeroLevel, self.silica_centerPoint, self.silica_DPhi0, self.silica_beamwaist, self.z_range)
                     self.silica_autofit_done = False
             case "Solvent":
                 # Data to be fitted
@@ -2195,10 +2162,6 @@ class Window(QtWidgets.QMainWindow):
 
             case "Sample":
                 pass
-        
-        self.draw_fitting_line(ftype,stype)
-        self.get_curve_interpretation(ftype,stype,'from_geometry')
-        
         
         self.draw_fitting_line(ftype,stype)
         self.get_curve_interpretation(ftype,stype,'from_geometry')
