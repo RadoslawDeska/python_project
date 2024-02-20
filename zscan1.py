@@ -44,6 +44,9 @@ from lib.mgmotor import MG17Motor
 # from lib.scientific_rounding import error_rounding
 from lib.worker import Worker
 
+from packages import thorlabs_apt as apt # importing it from custom location allows to place APT.dll
+                                         # in the package directory to read it (it is more user-friendly)
+
 matplotlib.rcParams.update({'font.size': 7})
 #from matplotlib.widgets import BlittedCursor
 
@@ -291,7 +294,7 @@ class Window(QtWidgets.QMainWindow):
 
     def clicker_triggers(self):
         # Menu triggers
-        self.actionExit.triggered.connect(self.shutdown)
+        self.actionExit.triggered.connect(self.closeEvent)
         self.actionLoadSolvents.triggered.connect(lambda: self.load_solvents(caller="LoadSolvents"))
         self.actionLight.triggered.connect(self.changeSkinLight)
         self.actionDark.triggered.connect(self.changeSkinDark)
@@ -531,10 +534,6 @@ class Window(QtWidgets.QMainWindow):
     def motor_detection_and_homing(self, *args, **kwargs):
         motor_id = 40180184
 
-        from packages import thorlabs_apt as apt
-        # importing it from custom location allows to place APT.dll
-        # in the package directory to read it (it is more user-friendly)
-        
         try:
             self.motor = apt.Motor(motor_id)
             self.ocx.configure(motor_id)
@@ -577,10 +576,8 @@ class Window(QtWidgets.QMainWindow):
             self.measurement_clear()
 
 # QUITTING THE PROGRAM
-    def shutdown(self):
-        """
-        """        
-        reply = QMessageBox.question(self, 'Window Close', 'Are you sure you want to close the window?', QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+    def closeEvent(self, event):
+        reply = QMessageBox.question(self, 'Window Close', 'Are you sure you want to close the program?', QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
 
         if reply == QMessageBox.Yes:
             save_settings(self,self.settings)
@@ -588,7 +585,8 @@ class Window(QtWidgets.QMainWindow):
             sys.exit()
 
 # DATA ACQUISITION AND DISPLAY
-    def measurement_clear(self): # clears all in the first two tabs (Measurement and Data Saving)
+    def measurement_clear(self):
+        '''clears all in the first two tabs (Measurement and Data Saving)'''
         self.clearing = True
         self.data_acquisition_complete = False
 

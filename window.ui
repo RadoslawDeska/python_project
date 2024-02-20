@@ -55,7 +55,6 @@
      </property>
      <property name="font">
       <font>
-       <weight>75</weight>
        <bold>true</bold>
       </font>
      </property>
@@ -1214,7 +1213,6 @@ border:None;</string>
        </property>
        <property name="font">
         <font>
-         <weight>75</weight>
          <italic>false</italic>
          <bold>true</bold>
         </font>
@@ -1512,7 +1510,6 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -1529,7 +1526,6 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -1609,7 +1605,6 @@ border:None;</string>
              <widget class="QLabel" name="label_44">
               <property name="font">
                <font>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -1653,7 +1648,6 @@ border:None;</string>
              <widget class="QLabel" name="label_45">
               <property name="font">
                <font>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -2065,7 +2059,6 @@ border:None;</string>
               <widget class="QLabel" name="label_67">
                <property name="font">
                 <font>
-                 <weight>75</weight>
                  <bold>true</bold>
                 </font>
                </property>
@@ -2257,7 +2250,6 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -2274,7 +2266,6 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -2855,7 +2846,6 @@ border:None;</string>
               <widget class="QLabel" name="label_74">
                <property name="font">
                 <font>
-                 <weight>75</weight>
                  <bold>true</bold>
                 </font>
                </property>
@@ -2941,7 +2931,6 @@ border:None;</string>
              <widget class="QLabel" name="label_83">
               <property name="font">
                <font>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -2976,7 +2965,6 @@ border:None;</string>
              <widget class="QLabel" name="label_79">
               <property name="font">
                <font>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -3097,7 +3085,6 @@ border:None;</string>
              <widget class="QLabel" name="label_103">
               <property name="font">
                <font>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -3669,7 +3656,6 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -3686,7 +3672,6 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -3860,7 +3845,6 @@ border:None;</string>
               <widget class="QLabel" name="label_73">
                <property name="font">
                 <font>
-                 <weight>75</weight>
                  <bold>true</bold>
                 </font>
                </property>
@@ -4184,7 +4168,6 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -4201,7 +4184,6 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -4782,7 +4764,6 @@ border:None;</string>
               <widget class="QLabel" name="label_76">
                <property name="font">
                 <font>
-                 <weight>75</weight>
                  <bold>true</bold>
                 </font>
                </property>
@@ -4868,7 +4849,6 @@ border:None;</string>
              <widget class="QLabel" name="label_139">
               <property name="font">
                <font>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -4903,7 +4883,6 @@ border:None;</string>
              <widget class="QLabel" name="label_80">
               <property name="font">
                <font>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -5024,7 +5003,6 @@ border:None;</string>
              <widget class="QLabel" name="label_140">
               <property name="font">
                <font>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -5596,7 +5574,6 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -5613,7 +5590,6 @@ border:None;</string>
               <property name="font">
                <font>
                 <pointsize>10</pointsize>
-                <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
@@ -5787,7 +5763,6 @@ border:None;</string>
               <widget class="QLabel" name="label_77">
                <property name="font">
                 <font>
-                 <weight>75</weight>
                  <bold>true</bold>
                 </font>
                </property>
@@ -6372,7 +6347,6 @@ border:None;</string>
        </property>
        <property name="font">
         <font>
-         <weight>75</weight>
          <bold>true</bold>
         </font>
        </property>
@@ -6391,7 +6365,6 @@ border:None;</string>
        </property>
        <property name="font">
         <font>
-         <weight>75</weight>
          <bold>true</bold>
         </font>
        </property>
@@ -6410,7 +6383,6 @@ border:None;</string>
        </property>
        <property name="font">
         <font>
-         <weight>75</weight>
          <bold>true</bold>
         </font>
        </property>
@@ -6631,7 +6603,6 @@ QPushButton::enabled{
      <property name="font">
       <font>
        <pointsize>12</pointsize>
-       <weight>75</weight>
        <bold>true</bold>
       </font>
      </property>
@@ -6655,7 +6626,7 @@ QPushButton::pressed{border-style:inset}</string>
      <x>0</x>
      <y>0</y>
      <width>1340</width>
-     <height>21</height>
+     <height>22</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -6678,7 +6649,18 @@ QPushButton::pressed{border-style:inset}</string>
     </widget>
     <addaction name="menuTheme"/>
    </widget>
+   <widget class="QMenu" name="menuSettings">
+    <property name="title">
+     <string>Settings</string>
+    </property>
+    <addaction name="actionLoad"/>
+    <addaction name="actionSave"/>
+    <addaction name="separator"/>
+    <addaction name="actionRestore_default"/>
+    <addaction name="actionOpen_editor"/>
+   </widget>
    <addaction name="menuFile"/>
+   <addaction name="menuSettings"/>
    <addaction name="menuView"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
@@ -6700,6 +6682,26 @@ QPushButton::pressed{border-style:inset}</string>
   <action name="actionLoadSolvents">
    <property name="text">
     <string>Load solvents</string>
+   </property>
+  </action>
+  <action name="actionLoad">
+   <property name="text">
+    <string>Load</string>
+   </property>
+  </action>
+  <action name="actionRestore_default">
+   <property name="text">
+    <string>Restore default</string>
+   </property>
+  </action>
+  <action name="actionSave">
+   <property name="text">
+    <string>Save</string>
+   </property>
+  </action>
+  <action name="actionOpen_editor">
+   <property name="text">
+    <string>Open editor</string>
    </property>
   </action>
  </widget>
