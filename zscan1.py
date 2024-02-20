@@ -27,6 +27,7 @@ import nidaqmx
 import numpy as np
 from lmfit import Minimizer, Parameters  #, fit_report
 from nidaqmx.constants import AcquisitionType, Edge
+from nidaqmx import stream_readers
 from numpy.typing import NDArray
 from PyQt5 import QtCore, QtGui, QtWidgets, uic
 from PyQt5.QtCore import QFile, QFileInfo, QObject, QSettings, QThreadPool, QTimer
@@ -2222,7 +2223,7 @@ class Window(QtWidgets.QMainWindow):
         worker.signals.result.connect(self.print_output)
         worker.signals.finished.connect(self.thread_complete)
 
-        if func_to_execute is self.mpositioner.movetostart:
+        if func_to_execute == self.mpositioner.movetostart:
             worker.signals.progress.connect(self.create_raw_log_line)
 
         # Execute
