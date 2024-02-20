@@ -90,7 +90,7 @@ class BlittedCursor:
         self.vertical_line = ax.axvline(color=self.color, lw=self.linewidth, ls=self.linestyle)
         self.print_text = print_text
         # text location in axes coordinates
-        if self.print_text == True:
+        if self.print_text is True:
             self.text = ax.text(0.72, 0.9, '', transform=ax.transAxes)
         self._creating_background = False
         ax.figure.canvas.mpl_connect('draw_event', self.on_draw)
@@ -102,7 +102,7 @@ class BlittedCursor:
         need_redraw = self.horizontal_line.get_visible() != visible
         self.horizontal_line.set_visible(visible)
         self.vertical_line.set_visible(visible)
-        if self.print_text == True:
+        if self.print_text is True:
             self.text.set_visible(visible)
         return need_redraw
 
@@ -129,15 +129,15 @@ class BlittedCursor:
             self.set_cross_hair_visible(True)
             # update the line positions
             x, y = event.xdata, event.ydata
-            self.horizontal_line.set_ydata(y)
-            self.vertical_line.set_xdata(x)
-            if self.print_text == True:
+            self.horizontal_line.set_ydata([y])
+            self.vertical_line.set_xdata([x])
+            if self.print_text is True:
                 self.text.set_text('x=%1.2f, y=%1.2f' % (x, y))
 
             self.ax.figure.canvas.restore_region(self.background)
             self.ax.draw_artist(self.horizontal_line)
             self.ax.draw_artist(self.vertical_line)
-            if self.print_text == True:
+            if self.print_text is True:
                 self.ax.draw_artist(self.text)
             self.ax.figure.canvas.blit(self.ax.bbox)
 
@@ -173,7 +173,7 @@ class SnappingCursor:
         self._last_index = None
         self.print_text = print_text
         # text location in axes coordinates
-        if self.print_text == True:
+        if self.print_text is True:
             self.text = ax.text(0.72, 0.9, '', transform=ax.transAxes)
         self._creating_background = False
         ax.figure.canvas.mpl_connect('draw_event', self.on_draw)
@@ -185,7 +185,7 @@ class SnappingCursor:
         need_redraw = self.horizontal_line.get_visible() != visible
         self.horizontal_line.set_visible(visible)
         self.vertical_line.set_visible(visible)
-        if self.print_text == True:
+        if self.print_text is True:
             self.text.set_visible(visible)
         return need_redraw
     
@@ -221,11 +221,11 @@ class SnappingCursor:
             # update the line positions
             self.horizontal_line.set_ydata(y)
             self.vertical_line.set_xdata(x)
-            if self.print_text == True:
+            if self.print_text is True:
                 self.text.set_text('x=%1.2f, y=%1.2f' % (x, y))
             self.ax.figure.canvas.restore_region(self.background)
             self.ax.draw_artist(self.horizontal_line)
             self.ax.draw_artist(self.vertical_line)
-            if self.print_text == True:
+            if self.print_text is True:
                 self.ax.draw_artist(self.text)
             self.ax.figure.canvas.blit(self.ax.bbox)

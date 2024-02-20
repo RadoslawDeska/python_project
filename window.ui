@@ -85,7 +85,7 @@
       <enum>QTabWidget::Rounded</enum>
      </property>
      <property name="currentIndex">
-      <number>2</number>
+      <number>0</number>
      </property>
      <widget class="QWidget" name="measurementTab">
       <attribute name="title">
@@ -983,7 +983,7 @@ border:None;</string>
         <enum>QTabWidget::Rounded</enum>
        </property>
        <property name="currentIndex">
-        <number>1</number>
+        <number>0</number>
        </property>
        <widget class="QWidget" name="tab_3">
         <attribute name="title">
@@ -1627,10 +1627,10 @@ border:None;</string>
                <string>This slider controls the width of the curve, but other sliders may influence apparent width as well.</string>
               </property>
               <property name="minimum">
-               <number>0</number>
+               <number>1</number>
               </property>
               <property name="maximum">
-               <number>2000</number>
+               <number>2001</number>
               </property>
               <property name="singleStep">
                <number>10</number>
@@ -1994,10 +1994,10 @@ border:None;</string>
             </font>
            </property>
            <property name="text">
-            <string>Automatic fitting summary</string>
+            <string>Fitting summary</string>
            </property>
            <property name="alignment">
-            <set>Qt::AlignCenter</set>
+            <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
            </property>
           </widget>
           <widget class="QFrame" name="frame_3">
@@ -6583,9 +6583,6 @@ border:None;</string>
          <width>321</width>
          <height>61</height>
         </rect>
-       </property>
-       <property name="autoFillBackground">
-        <bool>true</bool>
        </property>
        <property name="text">
         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;&lt;span style=&quot; font-size:12pt; font-weight:600; color:#ff0000;&quot;&gt;INACTIVE&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>

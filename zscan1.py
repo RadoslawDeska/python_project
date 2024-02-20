@@ -8,7 +8,7 @@ M. G. Kuzyk and C. W. Dirk, Eds., page 655-692, Marcel Dekker, Inc., 1998
 """
 
 __author__ = "Radosław Deska"
-__version__ = '0.1.1'
+__version__ = '0.1.2'
 
 import json
 import logging
@@ -27,7 +27,7 @@ import nidaqmx
 import numpy as np
 from lmfit import Minimizer, Parameters  #, fit_report
 from nidaqmx.constants import AcquisitionType, Edge
-from nidaqmx import stream_readers
+from nidaqmx import stream_readers  # noqa: F401
 from numpy.typing import NDArray
 from PyQt5 import QtCore, QtGui, QtWidgets, uic
 from PyQt5.QtCore import QFile, QFileInfo, QObject, QSettings, QThreadPool, QTimer
@@ -37,7 +37,7 @@ from scipy.signal import medfilt
 from scipy.special import hyp2f1
 from sigfig import round as error_rounding
 
-
+from lib.settings import apply_settings, save_settings
 from lib.cursors import BlittedCursor
 from lib.figure import MplCanvas
 from lib.mgmotor import MG17Motor
@@ -54,6 +54,7 @@ INTEGRATION_STEPS = 30 # accuracy of integration infinitesimal element, dx.
 CUVETTE_PATH_LENGTH = 0.001 # [m] path length inside cuvette
 SOLVENT_T_SLIDER_MAX = 1
 MAX_DPHI0 = 3.142 # maximum DeltaPhi0 for silica (for sliders)
+SIG_FIG_MAN_FIT = 3 # number of significant digits in rounding values while manually fitting the curves
 
 # @Adam notes:
 # 0. stdlib Pathlib  a= Path("solent.json").read_text()
@@ -68,14 +69,6 @@ MAX_DPHI0 = 3.142 # maximum DeltaPhi0 for silica (for sliders)
 # 3. linters: black, mypy (typing), ruff
 # 4. Flow -> think in terms of data flow (functional programming)
 
-
-def some_foo(s: str) -> str:
-    return s + "ss"
-
-def apply_settings(w, settings):
-    # Additions to UI design
-    w.mainDirectory_lineEdit.setText(settings.value('SavingTab/main_directory').replace("/","\\"))
-    w.dataDirectory_lineEdit.setText(settings.value('FittingTab/data_directory').replace("/","\\"))
 class Window(QtWidgets.QMainWindow):
 
 # @dataclass
@@ -103,7 +96,7 @@ class Window(QtWidgets.QMainWindow):
         else:
             settings_lines = [
                 "[UI]",
-                fr"ui_path={os.path.join(os.path.dirname(__file__), 'window.ui')}".replace("\\","/"),
+                "ui_path=./window.ui",
                 "[MeasurementTab]",
                 "starting_position=35",
                 "ending_position=75",
@@ -111,15 +104,17 @@ class Window(QtWidgets.QMainWindow):
                 "samples_per_position=200",
                 "[SavingTab]",
                 "silica_thickness=4",
-                fr"main_directory={os.path.join(os.path.dirname(__file__),'data')}".replace("\\","/"),
+                "concentration=0",
+                "wavelength=800",
+                "main_directory=C:/zscan/_wyniki",
                 "[FittingTab]",
-                fr"data_directory={os.path.join(os.path.dirname(__file__),'data')}".replace("\\","/"),
+                "data_directory=C:/zscan/_wyniki",
                 "silica_thickness=4",
                 "wavelength=800",
                 "zrange=40",
                 "aperture_diameter=1",
                 "distance_from_focus_to_CA=260",
-                fr"solvents_path={os.path.join(os.path.dirname(__file__), 'solvents.json')}".replace("\\","/")
+                "solvents_path=./solvents.json"
                 ]
             default_settings_str = '\n'.join(settings_lines)
             
@@ -136,6 +131,7 @@ class Window(QtWidgets.QMainWindow):
                 
         try:
             uic.loadUi(self.settings.value('UI/ui_path'), self)
+            print(f"found {self.settings.value('UI/ui_path')}")
         except FileNotFoundError:
             uic.loadUi('window.ui', self)
         apply_settings(self,self.settings)
@@ -587,10 +583,7 @@ class Window(QtWidgets.QMainWindow):
         reply = QMessageBox.question(self, 'Window Close', 'Are you sure you want to close the window?', QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
 
         if reply == QMessageBox.Yes:
-            # new_settings = dict()
-            # self.mainDirectory_lineEdit.setText(self.path.replace("/","\\"))
-            # self.dataDirectory_lineEdit.setText(self.path.replace("/","\\"))
-            # self.settings.setValue()
+            save_settings(self,self.settings)
             print('Program exited.')
             sys.exit()
 
@@ -873,6 +866,13 @@ class Window(QtWidgets.QMainWindow):
                 self.data_display(self.data_set, ftype)
 
                 self.switch_fitting_to_on_state(ftype)
+                # Adjust centerPoint slider (prevent unexpected shifting of the slider and the curve to a side of the plot)
+                match ftype:
+                    case "Silica":
+                        self.silica_centerPoint_slider.setMaximum(self.silica_nop-1)
+                        # Reset slider to center position
+                        self.silica_centerPoint_slider.setValue(int(self.silica_nop/2))
+                        
                 if ftype == 'Silica':
                     self.silica_autofit_done = False # this is to start afresh with fitting
 
@@ -1152,21 +1152,21 @@ class Window(QtWidgets.QMainWindow):
             caller (str, optional): Which fit type has called this function. Defaults to "".
         """
 
-        # DISPLAY VALUES (ALREADY ROUNDED)
+        # DISPLAY VALUES
         match ftype:
             case "Silica":
                 if caller == "auto":
-                    self.silica_deltaPhi0Summary_label.setText(str(self.silica_DPhi0)+' ± '+str(self.silica_DPhi0Error)) # rad
-                    self.silica_laserIntensitySummary_label.setText(str(self.laserI0*1E-13)+' ± '+str(self.laserI0Error*1E-13)) # [GW/cm2]
-                    self.silica_beamwaistSummary_label.setText(str(self.silica_beamwaist*1E6)+' ± '+str(self.silica_beamwaistError*1E6)) # [um] radius in focal point
-                    self.silica_rayleighRangeSummary_label.setText(str(self.silica_rayleighLength*1E3)+' ± '+str(self.silica_rayleighLengthError*1E3)) # [mm]
-                    self.numericalApertureSummary_label.setText(str(self.numericalAperture)+' ± '+str(self.numericalApertureError))
+                    self.silica_deltaPhi0Summary_label.setText(str(error_rounding(self.silica_DPhi0,self.silica_DPhi0Error))) # rad
+                    self.silica_laserIntensitySummary_label.setText(str(error_rounding(self.laserI0*1E-13,self.laserI0Error*1E-13))) # [GW/cm2]
+                    self.silica_beamwaistSummary_label.setText(str(error_rounding(self.silica_beamwaist*1E6,self.silica_beamwaistError*1E6))) # [um] radius in focal point
+                    self.silica_rayleighRangeSummary_label.setText(str(error_rounding(self.silica_rayleighLength*1E3,self.silica_rayleighLengthError*1E3))) # [mm]
+                    self.numericalApertureSummary_label.setText(str(error_rounding(self.numericalAperture,self.numericalApertureError)))
                 else:
-                    self.silica_deltaPhi0Summary_label.setText(str(self.silica_DPhi0)+' ± #.##') # rad
-                    self.silica_laserIntensitySummary_label.setText(str(self.laserI0*1E-13)+' ± #.##') # [GW/cm2]
-                    self.silica_beamwaistSummary_label.setText(str(error_rounding(self.silica_beamwaist*1E6, sigfigs=3, warn=False))+' ± #.##') # [um] radius in focal point
-                    self.silica_rayleighRangeSummary_label.setText(str(self.silica_rayleighLength)+' ± #.##') # [mm]
-                    self.numericalApertureSummary_label.setText(str(self.numericalAperture)+' ± #.##')
+                    self.silica_deltaPhi0Summary_label.setText(str(error_rounding(self.silica_DPhi0, sigfigs=SIG_FIG_MAN_FIT, warn=False))+' ± #.##') # rad
+                    self.silica_laserIntensitySummary_label.setText(str(error_rounding(self.laserI0*1E-13, sigfigs=SIG_FIG_MAN_FIT, warn=False))+' ± #.##') # [GW/cm2]
+                    self.silica_beamwaistSummary_label.setText(str(error_rounding(self.silica_beamwaist*1E6, sigfigs=SIG_FIG_MAN_FIT, warn=False))+' ± #.##') # [um] radius in focal point
+                    self.silica_rayleighRangeSummary_label.setText(str(error_rounding(self.silica_rayleighLength*1E3, sigfigs=SIG_FIG_MAN_FIT, warn=False))+' ± #.##') # [mm]
+                    self.numericalApertureSummary_label.setText(str(error_rounding(self.numericalAperture, sigfigs=SIG_FIG_MAN_FIT, warn=False))+' ± #.##')
                 
             case "Solvent":
                 if stype == "CA":
@@ -1208,11 +1208,6 @@ class Window(QtWidgets.QMainWindow):
             case "Silica":
                 match from_what:
                     case "from_geometry": # fit_manually
-                        # Adjust centerPoint slider (prevent unexpected shifting of the slider and the curve to a side of the plot)
-                        self.silica_centerPoint_slider.setMaximum(self.silica_nop-1)
-                        self.silica_centerPoint_slider.setValue(int(self.silica_nop/2))
-                        self.silica_centerPoint_slider.maximum()
-                        
                         # read sliders
                         self.silica_zeroLevel = self.silica_zeroLevel_slider.value()/100
                         self.silica_centerPoint = np.round(self.silica_centerPoint_slider.value()-self.silica_nop/2)
@@ -1224,97 +1219,27 @@ class Window(QtWidgets.QMainWindow):
                             self.silica_rayleighLength = self.silica_RayleighLength_slider.value()*self.z_range/2/self.silica_RayleighLength_slider.maximum()
                             self.silica_beamwaist = np.sqrt(self.silica_rayleighLength*self.lda/np.pi)
                     case "from_autofit": # fit_automatically
-                        self.silica_zeroLevel = self.silica_minimizerResult.params['Zero'].value
-                        self.silica_centerPoint = self.silica_minimizerResult.params['Center'].value
-                        self.silica_DPhi0 = self.silica_minimizerResult.params['DPhi0'].value
-                        self.silica_beamwaist = self.silica_minimizerResult.params['Beamwaist'].value
+                        self.silica_zeroLevel, self.silica_zeroLevelError = \
+                            self.silica_minimizerResult.params['Zero'].value,self.silica_minimizerResult.params['Zero'].stderr
+                        self.silica_centerPoint, self.silica_centerPointError = \
+                            self.silica_minimizerResult.params['Center'].value, self.silica_minimizerResult.params['Center'].stderr
+                        self.silica_DPhi0, self.silica_DPhi0Error = \
+                            self.silica_minimizerResult.params['DPhi0'].value, self.silica_minimizerResult.params['DPhi0'].stderr
+                        self.silica_beamwaist, self.silica_beamwaistError = \
+                            self.silica_minimizerResult.params['Beamwaist'].value, self.silica_minimizerResult.params['Beamwaist'].stderr
+                        
                         self.silica_rayleighLength = float(np.pi*self.silica_beamwaist**2/self.lda)
-                
-                self.laserI0 = self.silica_DPhi0*self.lda/(2*np.pi*self.l_silica*self.silica_n2) # [W/m2]
-                
-                try:
-                    self.numericalAperture = self.silica_beamwaist/self.silica_rayleighLength
-                except ZeroDivisionError:
-                    self.numericalAperture = 0
-                
-                # calculate errors
-                match from_what:
-                    case "from_geometry": # fit_manually
-                        self.silica_zeroLevel = error_rounding(
-                                self.silica_zeroLevel,
-                                sigfigs=3, warn=False
-                                )
-                        self.silica_centerPoint = error_rounding(
-                                self.silica_centerPoint,
-                                sigfigs=3, warn=False
-                                )
-                        self.silica_DPhi0 = error_rounding(self.silica_DPhi0, sigfigs=3, warn=False)
-                        
-                        self.silica_beamwaist = error_rounding(self.silica_beamwaist, sigfigs=3, warn=False)                            
-                        
-                        # self.silica_rayleighLengthError = \
-                        #     (np.pi/2/self.lda*self.silica_minimizerResult.params['Beamwaist'].value*self.silica_beamwaistError) # [m] Rayleigh length
-                        self.silica_rayleighLength = error_rounding(self.silica_rayleighLength, sigfigs=3, warn=False)
-
-                        # self.laserI0Error = self.silica_DPhi0Error*self.lda/(2*np.pi*self.l_silica*self.silica_n2) # [W/m2]
-                        self.laserI0 = error_rounding(self.laserI0,sigfigs=3, warn=False) # W/m2
-                        
-                        # self.numericalApertureError = self.silica_beamwaistError/self.silica_rayleighLength + \
-                        #     self.silica_beamwaist*self.silica_rayleighLengthError/self.silica_rayleighLength**2
-                        
-                        try:
-                            self.numericalAperture = error_rounding(self.numericalAperture, sigfigs=3, warn=False)
-                        except ValueError:
-                            self.numericalAperture = 0
-                    
-                    case "from_autofit": # fit_automatically
-                        self.silica_zeroLevel, self.silica_zeroLevelError = error_rounding(
-                                self.silica_minimizerResult.params['Zero'].value,
-                                uncertainty=self.silica_minimizerResult.params['Zero'].stderr,
-                                separation=tuple
-                                )
-                        self.silica_centerPoint, self.silica_centerPointError = error_rounding(
-                                self.silica_minimizerResult.params['Center'].value,
-                                uncertainty=self.silica_minimizerResult.params['Center'].stderr,
-                                separation=tuple
-                                )
-                        self.silica_DPhi0, self.silica_DPhi0Error = error_rounding(
-                                self.silica_minimizerResult.params['DPhi0'].value,
-                                uncertainty=self.silica_minimizerResult.params['DPhi0'].stderr,
-                                separation=tuple
-                                )
-                        self.silica_beamwaist, self.silica_beamwaistError = error_rounding(
-                                self.silica_minimizerResult.params['Beamwaist'].value,
-                                uncertainty=self.silica_minimizerResult.params['Beamwaist'].stderr,
-                                separation=tuple
-                                )
-                        
                         self.silica_rayleighLengthError = \
                             (np.pi/2/self.lda*self.silica_minimizerResult.params['Beamwaist'].value*self.silica_beamwaistError) # [m] Rayleigh length
-                        self.silica_rayleighLength, self.silica_rayleighLengthError = error_rounding(
-                                self.silica_rayleighLength,
-                                uncertainty=self.silica_rayleighLengthError,
-                                separation=tuple
-                                )
-
+                        
                         self.laserI0Error = self.silica_DPhi0Error*self.lda/(2*np.pi*self.l_silica*self.silica_n2) # [W/m2]
-                        
-                        self.laserI0, self.laserI0Error = error_rounding(
-                            self.laserI0,
-                            uncertainty=self.laserI0Error,
-                            separation=tuple
-                            ) # W/m2
-                        
-
                         self.numericalApertureError = self.silica_beamwaistError/self.silica_rayleighLength + \
                             self.silica_beamwaist*self.silica_rayleighLengthError/self.silica_rayleighLength**2
-                            
-                        if not np.isnan(self.numericalApertureError):
-                            self.numericalAperture, self.numericalApertureError = error_rounding(
-                                self.numericalAperture,
-                                uncertainty=self.numericalApertureError,
-                                separation=tuple
-                                )
+                
+                self.laserI0 = self.silica_DPhi0*self.lda/(2*np.pi*self.l_silica*self.silica_n2) # [W/m2]
+                self.numericalAperture = self.silica_beamwaist/self.silica_rayleighLength
+                if np.isnan(self.numericalAperture):
+                    self.numericalAperture = 0
 
             case "Solvent":
                 match stype:
@@ -1899,8 +1824,8 @@ class Window(QtWidgets.QMainWindow):
                 else:
                     self.silica_cursorPositions = []
                     self.silica_cursorPositions.append((x, y))
-                    self.silica_verline1.set_xdata(x)
-                    self.silica_verline2.set_xdata(None)
+                    self.silica_verline1.set_xdata([x])
+                    self.silica_verline2.set_xdata([None])
                 
                 self.silica_figure.draw_idle()
             
@@ -2224,6 +2149,7 @@ class Window(QtWidgets.QMainWindow):
         worker.signals.finished.connect(self.thread_complete)
 
         if func_to_execute == self.mpositioner.movetostart:
+            # these two do not point to the same memory address, so must be "==" instead of "is"!
             worker.signals.progress.connect(self.create_raw_log_line)
 
         # Execute
@@ -2272,6 +2198,9 @@ class Window(QtWidgets.QMainWindow):
         dark_palette.setColor(QPalette.Disabled, QPalette.ButtonText, QColor(100,100,100))
 
         QtGui.QGuiApplication.setPalette(dark_palette)
+        
+        if hasattr(self,"INACTIVE_SOLVENT_TAB_2"):
+            self.INACTIVE_SOLVENT_TAB_2.setStyleSheet("QLabel { background-color: rgb(47, 47, 52)}")
         
         # Measurement Tab Charts
         self.rms_text.set_color("white")
@@ -2326,6 +2255,9 @@ class Window(QtWidgets.QMainWindow):
         # PALETTE
         QtGui.QGuiApplication.setPalette(self.default_palette)
         
+        if hasattr(self,"INACTIVE_SOLVENT_TAB_2"):
+            self.INACTIVE_SOLVENT_TAB_2.setStyleSheet("QLabel { background-color: rgb(252, 252, 252)}")
+        
         # Measurement Tab Charts
         self.rms_text.set_color("black")
         self.rms_text.set_bbox(dict(boxstyle='round', facecolor="white", edgecolor="black", alpha=1))
@@ -2340,7 +2272,7 @@ class Window(QtWidgets.QMainWindow):
             chart.axes.set_xlabel(chart.axes.get_xlabel(), fontdict={'color': (0,0,0,1)})
             chart.axes.set_ylabel(chart.axes.get_ylabel(), fontdict={'color': (0,0,0,1)})
             chart.axes.tick_params(axis='both',which='both',colors=(0,0,0,1))
-            chart.axes.grid(which="both",color='darkgrey')
+            chart.axes.grid(which="both",color='#f9f9f9')
             chart.draw_idle()
         
         # Fitting Tab Charts
@@ -2356,7 +2288,7 @@ class Window(QtWidgets.QMainWindow):
                 chart.axes.set_xlabel(chart.axes.get_xlabel(), fontdict={'color': (0,0,0,1)})
                 chart.axes.set_ylabel(chart.axes.get_ylabel(), fontdict={'color': (0,0,0,1)})
                 chart.axes.tick_params(axis='both',which='both',colors=(0,0,0,1))
-                chart.axes.grid(which="both",color='darkgrey')
+                chart.axes.grid(which="both",color='#f9f9f9')
                 chart.draw_idle()
         
         # STYLESHEET
