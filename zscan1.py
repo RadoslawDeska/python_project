@@ -820,6 +820,13 @@ class Window(QtWidgets.QMainWindow):
             self.data_display(self.data_set, ftype)
 
             self.switch_fitting_to_on_state(ftype)
+            # Adjust centerPoint slider (prevent unexpected shifting of the slider and the curve to a side of the plot)
+            match ftype:
+                case "Silica":
+                    self.silica_centerPoint_slider.setMaximum(self.silica_nop-1)
+                    # Reset slider to center position
+                    self.silica_centerPoint_slider.setValue(int(self.silica_nop/2))
+            
             if ftype == 'Silica':
                 self.silica_autofit_done = False # this is to start afresh with fitting
 
