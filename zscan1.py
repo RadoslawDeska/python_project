@@ -8,7 +8,7 @@ M. G. Kuzyk and C. W. Dirk, Eds., page 655-692, Marcel Dekker, Inc., 1998
 """
 
 __author__ = "Radosław Deska"
-__version__ = '0.1.2'
+__version__ = '0.1.3'
 
 import json
 import logging
@@ -37,7 +37,7 @@ from scipy.signal import medfilt
 from scipy.special import hyp2f1
 from sigfig import round as error_rounding
 
-from lib.settings import apply_settings, save_settings
+from lib.settings import *  # noqa: F403
 from lib.cursors import BlittedCursor
 from lib.figure import MplCanvas
 from lib.mgmotor import MG17Motor
@@ -91,53 +91,27 @@ class Window(QtWidgets.QMainWindow):
 # INITIALIZATION
     def __init__(self, settings):
         super(Window, self).__init__()
+        ensure_default_settings_file()  # noqa: F405
         
+        # Check if initialized settings file exists and can be modified by the program       
         info = QFileInfo(settings)
         if QFile(settings).exists() and bool(info.permissions() & QFile.WriteUser):
             # if file exists and is writable            
             self.settings = QSettings(settings, QSettings.IniFormat)
         else:
-            settings_lines = [
-                "[UI]",
-                "ui_path=./window.ui",
-                "[MeasurementTab]",
-                "starting_position=35",
-                "ending_position=75",
-                "step_per_cycle=200",
-                "samples_per_position=200",
-                "[SavingTab]",
-                "silica_thickness=4",
-                "concentration=0",
-                "wavelength=800",
-                "main_directory=C:/zscan/_wyniki",
-                "[FittingTab]",
-                "data_directory=C:/zscan/_wyniki",
-                "silica_thickness=4",
-                "wavelength=800",
-                "zrange=40",
-                "aperture_diameter=1",
-                "distance_from_focus_to_CA=260",
-                "solvents_path=./solvents.json"
-                ]
-            default_settings_str = '\n'.join(settings_lines)
-            
-            if not QFile(os.path.join(os.path.dirname(__file__), "default_settings.ini")).exists():
-                # create default settings
-                with open(os.path.join(os.path.dirname(__file__), "default_settings.ini"), mode="w", encoding="utf-8") as fi:
-                    fi.write(default_settings_str)
-                os.chmod(os.path.join(os.path.dirname(__file__), "default_settings.ini"), 0o444) # prevent editing by setting permissions to read-only
-            
-            # create settings file that will be modified
+            # create settings file that will be modifiable
             with open(os.path.join(os.path.dirname(__file__), "settings.ini"), mode="w", encoding="utf-8") as fi:
-                fi.write(default_settings_str)
+                fi.write(DEFAULT_SETTINGS_LINES)  # noqa: F405
             self.settings = QSettings(os.path.join(os.path.dirname(__file__), "settings.ini"), QSettings.IniFormat)
+            write_settings_string(os.path.join(os.path.dirname(__file__), "settings.ini"),sort_settings(self.settings))  # noqa: F405
                 
         try:
             uic.loadUi(self.settings.value('UI/ui_path'), self)
-            print(f"found {self.settings.value('UI/ui_path')}")
         except FileNotFoundError:
-            uic.loadUi('window.ui', self)
-        apply_settings(self,self.settings)
+            try:
+                uic.loadUi('window.ui', self)
+            except FileNotFoundError:
+                return "Program files corrupted. GUI is missing file."
         
         self.solventOA_absorptionModel_label.setVisible(False)
         self.solventOA_absorptionModel_comboBox.setVisible(False)
@@ -155,13 +129,15 @@ class Window(QtWidgets.QMainWindow):
         self.clicker_triggers()
         self.timer_triggers()
         
+        apply_settings(self,self.settings)  # noqa: F405
+        
         # SHOW THE APP WINDOW
         self.show()
 
     def timing_and_threading(self):
         self.timer=QTimer()
         self.threadpool = QThreadPool()
-        print(f"Multithreading with maximum {self.threadpool.maxThreadCount()} threads")
+        # print(f"Multithreading with maximum {self.threadpool.maxThreadCount()} threads")
 
     def states(self):
         self.clearing = False
@@ -208,25 +184,32 @@ class Window(QtWidgets.QMainWindow):
         # Others
         
     def load_solvents(self, caller=""):
-        # Populate Solvent combobox with data from file
+        """
+        The function takes care of solvents JSON file opening process and calls load_and_autocomplete method to actually populate
+        a combo box with data from file.
+
+        Args:
+            caller (str, optional): If caller is `LoadSolvents` the method asks the user to indicate the JSON file. Defaults to ""
+            which means the file stored in settings.
+        """
         if caller == "":
             try:
-                with open(os.path.join(os.path.dirname(__file__), 'solvents.json'), mode="r", encoding="utf-8") as json_file:
+                with open(self.settings.value('FittingTab/solvents_path'), mode="r", encoding="utf-8") as json_file:
                     self.load_and_autocomplete(json_file)
                 
             except FileNotFoundError:
                 self.showdialog('Warning','solvents.json not found in the default location. Select the file.')
                 path = os.path.abspath(os.path.dirname(__file__)) # this is where solvents.json is expected to be
-                file = QFileDialog.getOpenFileName(self, "Open File", path,filter="JSON file (*.json)")
-                if file[0]!='': # if dialog was not cancelled
-                    with open(file[0], mode="r", encoding="utf-8") as json_file:
+                file, _ = QFileDialog.getOpenFileName(self, "Open File", path,filter="JSON file (*.json)")
+                if file: # if dialog was not cancelled
+                    with open(file, mode="r", encoding="utf-8") as json_file:
                         self.load_and_autocomplete(json_file)
             
         elif caller == "LoadSolvents":
-            path = os.path.abspath(os.path.dirname(__file__)) # this is where solvents.json is expected to be
-            file = QFileDialog.getOpenFileName(self, "Open File", path,filter="JSON file (*.json)")
-            if file[0]!='': # if dialog was not cancelled
-                with open(file[0], mode="r", encoding="utf-8") as json_file:
+            path = os.path.join(self.settings.value('FittingTab/solvents_path'),os.pardir) # this is where solvents.json is expected to be
+            file, _ = QFileDialog.getOpenFileName(self, "Open File", path,filter="JSON file (*.json)")
+            if file: # if dialog was not cancelled
+                with open(file, mode="r", encoding="utf-8") as json_file:
                     self.load_and_autocomplete(json_file)
             else:
                 return
@@ -238,11 +221,11 @@ class Window(QtWidgets.QMainWindow):
         
         :param json_file: The `json_file` parameter in the `load_and_autocomplete` method is expected to
         be a file object containing solvent data in JSON format. This method reads the JSON data from
-        the file, populates the `self.solvents` attribute with the data, adds the solvent names to a
-        combo box
+        the file, populates the `self.solvents` attribute with the data, adds the solvent names to the
+        solventName_comboBox combo box
         """
         self.solvents = json.load(json_file)
-        self.solventName_comboBox.addItems([key for key in self.solvents.keys()])
+        self.solventName_comboBox.addItems([key for key in sorted(self.solvents.keys())])
         self.solvent_autocomplete()
             
     def value_change_triggers(self):
@@ -294,8 +277,15 @@ class Window(QtWidgets.QMainWindow):
 
     def clicker_triggers(self):
         # Menu triggers
-        self.actionExit.triggered.connect(self.closeEvent)
+        # File
         self.actionLoadSolvents.triggered.connect(lambda: self.load_solvents(caller="LoadSolvents"))
+        self.actionExit.triggered.connect(self.closeEvent)
+        # Settings
+        # self.actionLoad.triggered.connect(lambda: pass)
+        self.actionSave.triggered.connect(lambda: save_settings(self,self.settings))  # noqa: F405
+        self.actionSave_As.triggered.connect(lambda: save_as(self,self.settings))  # noqa: F405
+        self.actionRestore_default.triggered.connect(lambda: apply_settings(self, QSettings(self.settings.value("UI/defaults_location"), QSettings.IniFormat))) # noqa: F405
+        # View
         self.actionLight.triggered.connect(self.changeSkinLight)
         self.actionDark.triggered.connect(self.changeSkinDark)
 
@@ -354,9 +344,9 @@ class Window(QtWidgets.QMainWindow):
         self.initializing = True
 
         # Initialize detectors
-        device_name = "/Dev1"
+        device_name = self.settings.value("Hardware/nidaqmx_device_name")
         self.detector_core_name = device_name+"/ai"
-        self.number_of_channels_used = 3
+        self.number_of_channels_used = int(self.settings.value("Hardware/nidaqmx_no_of_channels"))
         
         print('Detectors initialized')
 
@@ -397,7 +387,7 @@ class Window(QtWidgets.QMainWindow):
 
         self.measurement_plot_rescale()
 
-        print('Canvas loaded')
+        # print('Canvas loaded')
 
     def initialize_fitting_charts(self):
         # Silica chart
@@ -532,7 +522,7 @@ class Window(QtWidgets.QMainWindow):
             self.update_pushButton.setEnabled(True)
 
     def motor_detection_and_homing(self, *args, **kwargs):
-        motor_id = 40180184
+        motor_id = int(self.settings.value("Hardware/thorlabs_motor_id"))
 
         try:
             self.motor = apt.Motor(motor_id)
@@ -554,6 +544,8 @@ class Window(QtWidgets.QMainWindow):
         self.thread_it(self.mpositioner.movetocustompos)
 
     def set_to_start(self):
+        # save settings so that if there is any crash afterwards, the settings are preserved
+        save_settings(self, self.settings)  # noqa: F405
         self.running = True
         self.thread_it(self.mpositioner.movetostart)
 
@@ -580,7 +572,7 @@ class Window(QtWidgets.QMainWindow):
         reply = QMessageBox.question(self, 'Window Close', 'Are you sure you want to close the program?', QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
 
         if reply == QMessageBox.Yes:
-            save_settings(self,self.settings)
+            save_settings(self,self.settings)  # noqa: F405
             print('Program exited.')
             sys.exit()
 
@@ -677,7 +669,7 @@ class Window(QtWidgets.QMainWindow):
 
     def create_raw_log_line(self, step):
         if window.where_to_start == "end":
-            new_step = np.abs(step-200)
+            new_step = np.abs(step-self.stepsScan_spinBox.value())
             line = f"{new_step:4d}{' '}"
         else:
             line = f"{step:4d}{' '}"
@@ -2135,10 +2127,12 @@ class Window(QtWidgets.QMainWindow):
     
 # THREAD CONTROLS
     def print_output(self, returned_value):
-        print(returned_value)
+        # print(returned_value)
+        pass
     
     def thread_complete(self):
-        print("THREAD COMPLETE!")
+        # print("THREAD COMPLETE!")
+        pass
     
     def thread_it(self, func_to_execute):
         # Pass the function to execute
@@ -2156,7 +2150,7 @@ class Window(QtWidgets.QMainWindow):
         return worker
 
 # DIALOG BOXES
-    def showdialog(self, msg_type:str, message:str):
+    def showdialog(self, msg_type:str, message:str, kwargs={}):
         '''
         Message type (msg_type) is one of these: 'Error', 'Warning', 'Info'
         '''
@@ -2168,9 +2162,11 @@ class Window(QtWidgets.QMainWindow):
                 button = QMessageBox.warning(self, *dialog_args)
             case "Info":
                 button = QMessageBox.information(self, *dialog_args)
+            case "Question":
+                button = QMessageBox.question(self, *dialog_args)
         
-        if button == QMessageBox.Ok:
-           pass
+        if button == QMessageBox.Yes:
+            return button
 
 # COLOR THEMES
     @QtCore.pyqtSlot()
@@ -2712,12 +2708,14 @@ class MotorPositioner(QObject):
                 task.ai_channels.add_ai_voltage_chan(window.detector_core_name+f"0:{window.number_of_channels_used}") # "Dev1/ai0:3"
                 
                 # Start Digital Edge
-                task.triggers.start_trigger.dig_edge_src = "/Dev1/PFI0"
+                task.triggers.start_trigger.dig_edge_src = window.settings.value("Hardware/nidaqmx_dig_edge_src")
                 task_trigger_src = task.triggers.start_trigger.dig_edge_src
 
                 # Sample Clock
-                rate0 = 1000 # 1 kHz (repetition rate of the laser)
+                rate0 = float(window.settings.value("Hardware/laser_repetition_rate"))
                 task.timing.cfg_samp_clk_timing(rate0,source=task_trigger_src,active_edge=Edge.FALLING, sample_mode=AcquisitionType.FINITE, samps_per_chan=window.samplesStep_spinBox.value())
+                
+                sampling_period = float(window.settings.value("MeasurementTab/samples_per_position"))/rate0 # THIS IS THE TIME NEEDED TO COLLECT ALL SAMPLES
                 
                 ### Data acquisition
                 reader = nidaqmx.stream_readers.AnalogMultiChannelReader(task.in_stream)
@@ -2725,7 +2723,7 @@ class MotorPositioner(QObject):
                 # Start Task
                 task.start()
                 
-                time.sleep(0.2) # THIS IS THE TIME NEEDED TO COLLECT ALL SAMPLES
+                time.sleep(sampling_period)
 
                 # Acquire data
                 window.data["positions"].append(window.motor.position)
@@ -2767,8 +2765,8 @@ class MotorPositioner(QObject):
                 task.stop()
         
         # EMIT SOUND AT FINISH
-        duration = 500  # milliseconds
-        freq = 800  # Hz
+        duration = int(window.settings.value("Perks/end_beep_duration_ms"))
+        freq = int(window.settings.value("Perks/end_beep_tone_frequency"))
         for _ in range(3):
             winsound.Beep(freq, duration)
             time.sleep(0.05)
