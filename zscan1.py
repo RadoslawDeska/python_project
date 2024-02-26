@@ -8,7 +8,7 @@ M. G. Kuzyk and C. W. Dirk, Eds., page 655-692, Marcel Dekker, Inc., 1998
 """
 
 __author__ = "Radosław Deska"
-__version__ = '0.1.3'
+__version__ = '0.1.4'
 
 import json
 import logging
@@ -44,20 +44,20 @@ from lib.mgmotor import MG17Motor
 # from lib.scientific_rounding import error_rounding
 from lib.worker import Worker
 
-from packages import thorlabs_apt as apt # importing it from custom location allows to place APT.dll
-                                         # in the package directory to read it (it is more user-friendly)
+from packages import thorlabs_apt as apt  # importing it from custom location allows to place APT.dll
+                                          # in the package directory to read it (it is more user-friendly)
 
 matplotlib.rcParams.update({'font.size': 7})
 #from matplotlib.widgets import BlittedCursor
 
 # CONSTANTS
 SILICA_BETA = 0
-N_COMPONENTS = 8 # number of electric field components (for Gaussian decomposition)
-INTEGRATION_STEPS = 30 # accuracy of integration infinitesimal element, dx.
-CUVETTE_PATH_LENGTH = 0.001 # [m] path length inside cuvette
+N_COMPONENTS = 8  # number of electric field components (for Gaussian decomposition)
+INTEGRATION_STEPS = 30  # accuracy of integration infinitesimal element, dx.
+CUVETTE_PATH_LENGTH = 0.001  # [m] path length inside cuvette
 SOLVENT_T_SLIDER_MAX = 1
-MAX_DPHI0 = 3.142 # maximum DeltaPhi0 for silica (for sliders)
-SIG_FIG_MAN_FIT = 3 # number of significant digits in rounding values while manually fitting the curves
+MAX_DPHI0 = 3.142  # maximum DeltaPhi0 for silica (for sliders)
+SIG_FIG_MAN_FIT = 3  # number of significant digits in rounding values while manually fitting the curves
 
 # @Adam notes:
 # 0. stdlib Pathlib  a= Path("solent.json").read_text()
@@ -73,21 +73,6 @@ SIG_FIG_MAN_FIT = 3 # number of significant digits in rounding values while manu
 # 4. Flow -> think in terms of data flow (functional programming)
 
 class Window(QtWidgets.QMainWindow):
-
-# @dataclass
-# class Configuration:
-#     path: Path
-#     solvent_file: Path = "solvent.json"
-    
-    
-#     @classmethod
-#     def load_from_file(config_filename) -> Configuration:
-#         with open(cnfig_filename) as f:
-#             data = json.load(f)
-            
-#         self.path = data["path"]
-#         self.solvent_flename =\ ///
-
 # INITIALIZATION
     def __init__(self, settings):
         super(Window, self).__init__()
@@ -235,17 +220,8 @@ class Window(QtWidgets.QMainWindow):
         self.stepsScan_spinBox.valueChanged.connect(self.measurement_plot_rescale)
             
             # Data saving Tab
-        self.concentration_dataSavingTab_doubleSpinBox.editingFinished.connect(
-            lambda: self.concentration_dataSavingTab_doubleSpinBox.setText(
-                self.concentration_dataSavingTab_doubleSpinBox.text()+" %")
-            if "%" not in self.concentration_dataSavingTab_doubleSpinBox.text()
-            else self.concentration_dataSavingTab_doubleSpinBox.text())
-        self.wavelength_dataSavingTab_doubleSpinBox.editingFinished.connect(
-            lambda: self.wavelength_dataSavingTab_doubleSpinBox.setText(
-                self.wavelength_dataSavingTab_doubleSpinBox.text()+" nm") 
-            if "nm" not in self.wavelength_dataSavingTab_doubleSpinBox.text() 
-            else self.wavelength_dataSavingTab_doubleSpinBox.text())
-            
+        self.codeOfSample_lineEdit.editingFinished.connect(lambda: self.sample_code_autocompleter("code"))
+        self.concentration_dataSavingTab_doubleSpinBox.editingFinished.connect(lambda: self.sample_code_autocompleter("conc"))
             # Data fitting Tab
         self.solventName_comboBox.currentIndexChanged.connect(self.solvent_autocomplete)
         self.zscanRange_doubleSpinBox.editingFinished.connect(self.set_new_positions)
@@ -284,7 +260,7 @@ class Window(QtWidgets.QMainWindow):
         # self.actionLoad.triggered.connect(lambda: pass)
         self.actionSave.triggered.connect(lambda: save_settings(self,self.settings))  # noqa: F405
         self.actionSave_As.triggered.connect(lambda: save_as(self,self.settings))  # noqa: F405
-        self.actionRestore_default.triggered.connect(lambda: apply_settings(self, QSettings(self.settings.value("UI/defaults_location"), QSettings.IniFormat))) # noqa: F405
+        self.actionRestore_default.triggered.connect(lambda: apply_settings(self, QSettings(self.settings.value("UI/defaults_location"), QSettings.IniFormat)))  # noqa: F405
         # View
         self.actionLight.triggered.connect(self.changeSkinLight)
         self.actionDark.triggered.connect(self.changeSkinDark)
@@ -335,13 +311,14 @@ class Window(QtWidgets.QMainWindow):
         self.solventOA_absorptionModel_comboBox.currentIndexChanged.connect(lambda: self.toggle_saturation_model(ftype="Solvent"))
         self.solventOA_customCenterPoint_checkBox.stateChanged.connect(lambda: self.enable_custom('SolventCenterPoint'))
         
-    def timer_triggers(self): #(started with Initalize button click)
+    def timer_triggers(self):  # started with Initalize button click
         self.timer.timeout.connect(self.motion_detection)
         
         self.start_timer()
     
     def initialize(self, *args, **kwargs):
         self.initializing = True
+        self.initialize_pushButton.setEnabled(False)
 
         # Initialize detectors
         device_name = self.settings.value("Hardware/nidaqmx_device_name")
@@ -528,6 +505,12 @@ class Window(QtWidgets.QMainWindow):
             self.motor = apt.Motor(motor_id)
             self.ocx.configure(motor_id)
             print(f'Motor {motor_id} connected')
+            
+            if self.motor.get_stage_axis_info()[2] == 1: # STAGE_UNITS_MM
+                self.startPos_doubleSpinBox.setMinimum(self.motor.get_stage_axis_info()[0])
+                self.startPos_doubleSpinBox.setMaximum(self.motor.get_stage_axis_info()[1])
+                self.endPos_doubleSpinBox.setMinimum(self.motor.get_stage_axis_info()[0])
+                self.endPos_doubleSpinBox.setMaximum(self.motor.get_stage_axis_info()[1])
         
         except Exception:
             logging.error(traceback.format_exc())
@@ -741,6 +724,8 @@ class Window(QtWidgets.QMainWindow):
         self.fullLogData_textBrowser.append(header)
         self.fullLogData_textBrowser.append(raw_log)
 
+        self.fullLogData_textBrowser.verticalScrollBar().setValue(0)
+
         # log data
         if self.data_acquisition_complete is True:
             raw_log_data = np.genfromtxt(raw_log.split('\n'))
@@ -767,6 +752,8 @@ class Window(QtWidgets.QMainWindow):
         self.fullLogFilename_lineEdit.setText(f"{self.cur_date}__{self.cur_time}__{sample_type}_{conc_hyphen}_{wavel_hyphen}_2.txt")
 
         self.files = (self.rawLogFilename_lineEdit.text(), self.fullLogFilename_lineEdit.text())
+        
+        self.datalogTabs.setCurrentIndex(1)
     
     def data_save(self):
         self.accurate_path = os.path.join(self.mainDirectory_lineEdit.text(),self.cur_date)
@@ -790,9 +777,29 @@ class Window(QtWidgets.QMainWindow):
             self.showdialog('Error', 'Permission denied!\nCannot write the file in this directory.')
 
 # DATA FITTING
-    def data_loader(self, caller:str, ftype:str):
+    def data_loader(self, caller: str, ftype: str):
         '''Load data either from file or from current measurement ('caller' argument).\n
         'ftype' is passed by proper button for loading from file, or by proper option in "Cuvette type" combobox in "Data Saving" tab'''
+        
+        def prepare_to_fit_manually(caller: str, ftype: str):
+            # Read parameters
+            self.read_header_params(caller=caller, ftype=ftype)
+            self.data_display(self.data_set, ftype)
+
+            self.switch_fitting_to_on_state(ftype)
+            # Adjust centerPoint slider (prevent unexpected shifting of the slider and the curve to a side of the plot)
+            match ftype:
+                case "Silica":
+                    self.silica_centerPoint_slider.setMaximum(self.silica_nop-1)
+                    # Reset slider to center position
+                    self.silica_centerPoint_slider.setValue(int(self.silica_nop/2))
+            
+            if ftype == 'Silica':
+                self.silica_autofit_done = False # this is to start afresh with fitting
+
+            self.fit_manually(ftype,stype="CA")
+            self.fit_manually(ftype,stype="OA")
+                
         if caller == "Current Measurement":
             # Fill in names in QLineEdits
             self.dataDirectory_lineEdit.setText(self.accurate_path+"\\")
@@ -815,31 +822,24 @@ class Window(QtWidgets.QMainWindow):
             # Get data
             self.data_set = range(self.stepsScan_spinBox.value()+1), self.data["absolute"][0], self.data["absolute"][1], self.data["absolute"][2]#, data[:,3] not using the last column with zeros
             
-            # Read parameters
-            self.read_header_params(caller = "Current Measurement", ftype=ftype)
-            self.data_display(self.data_set, ftype)
-
-            self.switch_fitting_to_on_state(ftype)
-            # Adjust centerPoint slider (prevent unexpected shifting of the slider and the curve to a side of the plot)
-            match ftype:
-                case "Silica":
-                    self.silica_centerPoint_slider.setMaximum(self.silica_nop-1)
-                    # Reset slider to center position
-                    self.silica_centerPoint_slider.setValue(int(self.silica_nop/2))
-            
-            if ftype == 'Silica':
-                self.silica_autofit_done = False # this is to start afresh with fitting
-
-            self.fit_manually(ftype,stype="CA")
-            self.fit_manually(ftype,stype="OA")
+            prepare_to_fit_manually(caller=caller, ftype=ftype)
         
         elif caller == "Load From File":
             # Load data
-            def load_data():
+            def load_data(caller, ftype):
                 """Fills proper frame in GUI with file information, sets current tab to lead the user,\n                
                 loads data on screen, toggles to active state the fitting controls and calls for the initial fit\n
                 for both CA and OA traces.
                 """
+                # if the header is correct, uncheck "set custom" checkboxes
+                if self.header_correct:
+                    for target in targets_checkboxes:
+                        target.setChecked(False)
+                # otherwise uncheck only those checkboxes that were found in the header
+                else:
+                    for i, matched in enumerate(header_matches[:-1]):  # apart from the last element which is the header beacon
+                        targets_checkboxes[i].setChecked(not matched)
+                
                 # Fill in names in QLineEdits
                 match ftype:
                     case "Silica":
@@ -858,23 +858,8 @@ class Window(QtWidgets.QMainWindow):
                 # Get data
                 data = np.genfromtxt(p, skip_header=last_header_line)
                 self.data_set = data[:,0], data[:,1], data[:,2], data[:,3]#, data[:,4] not using the last column with zeros
-                # Read parameters
-                self.read_header_params(caller = "Load From File", ftype=ftype)
-                self.data_display(self.data_set, ftype)
-
-                self.switch_fitting_to_on_state(ftype)
-                # Adjust centerPoint slider (prevent unexpected shifting of the slider and the curve to a side of the plot)
-                match ftype:
-                    case "Silica":
-                        self.silica_centerPoint_slider.setMaximum(self.silica_nop-1)
-                        # Reset slider to center position
-                        self.silica_centerPoint_slider.setValue(int(self.silica_nop/2))
-                        
-                if ftype == 'Silica':
-                    self.silica_autofit_done = False # this is to start afresh with fitting
-
-                self.fit_manually(ftype, stype="CA")
-                self.fit_manually(ftype, stype="OA")
+                
+                prepare_to_fit_manually(caller=caller, ftype=ftype)
             
             p = QFileDialog.getOpenFileName(self, 'Select full description file', os.path.normpath(self.dataDirectory_lineEdit.text()))
             if p[0] != "": # This keeps old filename in given file type QLineEdit lines, if dialog is closed with Cancel
@@ -885,62 +870,71 @@ class Window(QtWidgets.QMainWindow):
                 # Header check and manipulation
                 with open(p, 'r') as file:
                     # Correct header must include these and a beacon at the end in the form of "SNo" substring
-                    required_matches = ["Concentration","Wavelength","Starting pos","Ending pos", "SNo"]
-                    optional_matches = ["Silica thickness"]
+                    required_matches = ["Silica thickness",
+                                        "Concentration",
+                                        "Wavelength",
+                                        "Starting pos",
+                                        "Ending pos",
+                                        "SNo"]
+                    targets_checkboxes = [self.customSilicaThickness_checkBox,
+                                          self.customConcentration_checkBox,
+                                          self.customWavelength_checkBox,
+                                          self.customZscanRange_checkBox,
+                                          self.customZscanRange_checkBox]
+                    missing_matches = []
                     header_matches = len(required_matches)*[False]
                     self.header = []
                     last_header_line = 0
 
                     for line_no, line in enumerate(file):
-                        for match in required_matches:
-                            if re.match(r"\b%s\b" % match, line): # lookup whole words
-                                header_matches[required_matches.index(match)] = True
-                                self.header.append(line.strip())
-
-                                if match == "SNo": # This is the header end beacon
-                                    last_header_line = line_no+3
-                        
-                        opt_matched = 0
-                        for opt_match in optional_matches:
-                            if re.match(r"\b%s\b" % opt_match, line): # lookup whole words
-                                header_matches.append(True)
-                                self.header.append(line.strip())
-                                opt_matched += 1
+                        # first look for the header end beacon
+                        if re.match(fr"\b{required_matches[-1]}\b", line):
+                            last_header_line = line_no+3
+                            break
                     
-                    if len(self.header) != 0:
-                        if last_header_line != 0: # if the header end beacon was found
-                            self.header_correct = all(header_matches[:-(1+opt_matched)]) # check if required matches are satisfied
+                    if last_header_line > 0:  # Header found
+                        # look for other matches
+                        for i,match in enumerate(required_matches[:-1]):
+                            file.seek(0)
+                            for line_no, line in enumerate(file):
+                                if line_no == last_header_line:  # do not look further than header length
+                                    break
+                                
+                                if re.match(fr"\b{match}\b", line): # lookup whole words
+                                    header_matches[i] = True
+                                    self.header.append(line.strip())
                             
-                            if self.header_correct is False:
-                                self.showdialog('Warning',
-                                ('Header corrupted!\n\n'
-                                'Some parameters might have been loaded improperly.\n\nPut measurement parameters manually.'))
-
-                                self.customSilicaThickness_checkBox.setChecked(True)
-                                self.customWavelength_checkBox.setChecked(True)
-                                self.customZscanRange_checkBox.setChecked(True)
-
-                            load_data()
-
-                        else:
+                            if not header_matches[i]:
+                                missing_matches.append((i, match))
+                        
+                        if missing_matches:
                             self.header_correct = False
-                            self.showdialog('Warning',
-                                ('Header corrupted!\n\n'
-                                'Load a file without the header.'))
                             
-                    else:
+                            # Make nicely looking response in the dialog box
+                            if len(missing_matches) > 1:
+                                missing = ', '.join(miss for (_,miss) in missing_matches[:-1])
+                                missing = ' and '.join((missing,missing_matches[-1][1]))
+                            else:
+                                missing = missing_matches[-1][1]
+                            
+                            self.showdialog('Warning',
+                                ("Missing parameters!\n\n"
+                                f"{missing} not found in the header.\n\nSet measurement parameters manually."))
+                            
+                        else:
+                            self.header_correct = True
+                        
+                        load_data(caller=caller, ftype=ftype)
+                    
+                    else:  # Header not found
                         self.header_correct = False
                         self.showdialog('Warning',
-                        ('Header not found!\n\n'
-                        'Set measurement parameters by yourself or load a file with the header.'))
+                            ('Header not found!\n\n'
+                            'Set measurement parameters manually or load a file with the header.'))
 
-                        self.customSilicaThickness_checkBox.setChecked(True)
-                        self.customWavelength_checkBox.setChecked(True)
-                        self.customZscanRange_checkBox.setChecked(True)
+                        load_data(caller=caller, ftype=ftype)
 
-                        load_data()
-
-    def enable_custom(self, o:str):
+    def enable_custom(self, o: str):
         """Toggles readOnly parameter on `o` element from GUI. Uses match-case structure with `o` parameter to match\n
         to speed up processing at each call.
 
@@ -998,7 +992,7 @@ class Window(QtWidgets.QMainWindow):
                 else:
                     self.solventOA_centerPoint_slider.setEnabled(True)
 
-    def slider_fit_manually_connect(self, current_slider:QSlider, mode):
+    def slider_fit_manually_connect(self, current_slider: QSlider, mode):
         '''This function is intended to connect and disconnect other sliders on demand, to prevent them from updating the fitting line:
         1) "Disconnect" means current slider should be kept and all others should disconnect from their method
         2) "Connect" means reconnect all sliders to their method'''
@@ -1104,7 +1098,7 @@ class Window(QtWidgets.QMainWindow):
                         self.sampleOA_saturationModel_label.setVisible(False)
                         self.sampleOA_saturationModel_comboBox.setVisible(False)
 
-    def switch_fitting_to_on_state(self, ftype:str):
+    def switch_fitting_to_on_state(self, ftype: str):
         match ftype:
             case "Silica":
                 self.silica_RayleighLength_slider.setEnabled(True)
@@ -1140,7 +1134,7 @@ class Window(QtWidgets.QMainWindow):
             case "Sample":
                 pass
     
-    def set_fit_summary(self, ftype:str, stype:str, caller=""):
+    def set_fit_summary(self, ftype: str, stype: str, caller=""):
         """Sets proper number of digits in summary display and shows parameters (with errors) after (automatic) fitting.
 
         Args:
@@ -1198,7 +1192,7 @@ class Window(QtWidgets.QMainWindow):
         self.d0 = self.apertureToFocusDistance_doubleSpinBox.value()*1E-3 # [m] distance from focal point to aperture plane
         self.silica_n2 = 2.8203E-20 - 3E-27/(self.lda) + 2E-33/(self.lda)**2 # [m2/W] Bandar A. Babgi formula (based on David Milam tables for n2)
     
-    def get_curve_interpretation(self, ftype, stype, from_what:str, on_data_load=False):
+    def get_curve_interpretation(self, ftype, stype, from_what: str, on_data_load=False):
         '''Interprets the curve based on its geometry according to some approximated formulas (manual fitting)\n
         or based on automatic fitting parameters (automatic fitting) and calls for error estimation.'''
         match ftype:
@@ -1475,7 +1469,7 @@ class Window(QtWidgets.QMainWindow):
             case "Sample":
                 pass
         
-    def data_display(self, data_set, ftype:str):
+    def data_display(self, data_set, ftype: str):
         '''Called by data_loader(). Displays:\n
         1) CA column divided by OA column to remove influence of OA on CA as 'CA'
         2) OA column as 'OA'\n
@@ -1554,7 +1548,7 @@ class Window(QtWidgets.QMainWindow):
             self.sample_data_set[0] = np.array([(self.z_range*zz/self.sample_nop-self.z_range/2)*1000 for zz in range(self.sample_nop)]) # [mm] update positions with newly-read Z-scan range value
             self.update_datafitting_plotlimits(self.sample_data_set,ftype='Sample')
 
-    def update_datafitting_plotlimits(self, data_set:list, ftype:str) -> None:
+    def update_datafitting_plotlimits(self, data_set: list, ftype: str) -> None:
         """Updates limits of the data fitting plots for given `ftype` (Silica, Solvent, Sample)
 
         Args:
@@ -1725,7 +1719,7 @@ class Window(QtWidgets.QMainWindow):
                 self.showdialog('Error',
                 'Possibly too few data points!\nMinimum required is 16 datapoints.')
 
-    def enable_cursors(self, ftype:str, stype:str) -> None:
+    def enable_cursors(self, ftype: str, stype: str) -> None:
         match ftype:
             case "Silica":
                 if stype == "CA":
@@ -1806,7 +1800,7 @@ class Window(QtWidgets.QMainWindow):
                 elif stype == "OA":
                     self.sampleOA_cursor_positioner = BlittedCursor(self.sampleOA_figure.axes, color = 'magenta', linewidth = 2)
     
-    def collect_cursor_clicks(self, event, ftype:str, stype="") -> None:
+    def collect_cursor_clicks(self, event, ftype: str, stype="") -> None:
         x, y = event.xdata, event.ydata
         match ftype:
             case "Silica":
@@ -1864,7 +1858,7 @@ class Window(QtWidgets.QMainWindow):
             case "Sample":
                 pass
 
-    def draw_fitting_line(self, ftype:str, stype:str) -> None:
+    def draw_fitting_line(self, ftype: str, stype: str) -> None:
         match ftype:
             case 'Silica':
                 if self.silica_fittingLine_drawn is False:
@@ -1948,7 +1942,7 @@ class Window(QtWidgets.QMainWindow):
                             self.sampleOA_figure.axes.autoscale_view()
                             self.sampleOA_figure.draw_idle()
 
-    def fit_automatically(self, ftype:str, stype:str):
+    def fit_automatically(self, ftype: str, stype: str):
         self.get_general_parameters()
         self.get_curve_interpretation(ftype,stype,'from_geometry')
         
@@ -2033,7 +2027,7 @@ class Window(QtWidgets.QMainWindow):
 
                 pass
 
-    def fit_manually(self, ftype:str, stype:str) -> None:
+    def fit_manually(self, ftype: str, stype: str) -> None:
         """Triggered by loading the data (from experiment or from file) or by fitting sliders value change.
 
         Args:
@@ -2092,15 +2086,13 @@ class Window(QtWidgets.QMainWindow):
         caller = "manual"
         self.set_fit_summary(ftype, stype, caller)
         
-    def read_header_params(self, caller:str, ftype:str):
+    def read_header_params(self, caller: str, ftype: str):
         if caller == "Current Measurement":
             # General parameters
-            if self.customWavelength_checkBox.isChecked() is False:
-                self.wavelength_dataFittingTab_doubleSpinBox.setValue(self.wavelength_dataSavingTab_doubleSpinBox.value())
-            if self.customZscanRange_checkBox.isChecked() is False:
-                self.zscanRange_doubleSpinBox.setValue(np.abs(self.endPos_doubleSpinBox.value()-self.startPos_doubleSpinBox.value()))
-            if self.customSilicaThickness_checkBox.isChecked() is False:
-                self.silicaThickness_dataFittingTab_doubleSpinBox.setValue(self.silicaThickness_dataSavingTab_doubleSpinBox.value())
+            # No longer do the "set custom" checkboxes affect these actions
+            self.silicaThickness_dataFittingTab_doubleSpinBox.setValue(self.silicaThickness_dataSavingTab_doubleSpinBox.value())
+            self.wavelength_dataFittingTab_doubleSpinBox.setValue(self.wavelength_dataSavingTab_doubleSpinBox.value())
+            self.zscanRange_doubleSpinBox.setValue(np.abs(self.endPos_doubleSpinBox.value()-self.startPos_doubleSpinBox.value()))
             
             if ftype == "Sample":
                 self.concentration_dataFittingTab_doubleSpinBox.setValue(self.concentration_dataSavingTab_doubleSpinBox.value())
@@ -2109,12 +2101,16 @@ class Window(QtWidgets.QMainWindow):
             # Get parameters from the file header
             if len(self.header) != 0:
                 for hl in self.header:
+                    if hl.find("Silica thickness") != -1:
+                        silica_thickness_match = re.search(r'(?<=Silica thickness:)(.*)(?=mm)',hl)
+                        silica_thickness = float(silica_thickness_match.groups()[0])
+                        self.silicaThickness_dataFittingTab_doubleSpinBox.setValue(silica_thickness)
+                    
                     if hl.find("Wavelength") != -1:
                         wavelength_match = re.search(r'(([1-9][0-9]*\.?[0-9]*)|(\.[0-9]+))([Ee][+-]?[0-9]+)?',hl)
                         wavelength = float(wavelength_match.groups()[0])
                         self.wavelength_dataFittingTab_doubleSpinBox.setValue(wavelength)
                     
-                    #if ftype == "Silica" and self.customZscanRange_checkBox.isChecked() is False and hl.find("Starting pos") != -1:
                     if self.customZscanRange_checkBox.isChecked() is False and hl.find("Starting pos") != -1: # read zscanRange for any ftype
                         starting_pos_match = re.search(r'(([0-9][0-9]*\.?[0-9]*)|(\.[0-9]+))([Ee][+-]?[0-9]+)?',hl)
                         starting_pos = float(starting_pos_match.groups()[0])
@@ -2131,7 +2127,42 @@ class Window(QtWidgets.QMainWindow):
     def solvent_autocomplete(self):
         self.solventDensity_lineEdit.setText(str(self.solvents[self.solventName_comboBox.currentText()]["density"])+' g/cm3')
         self.solventRefrIdx_lineEdit.setText(str(self.solvents[self.solventName_comboBox.currentText()]["index"]))
-    
+
+    def sample_code_autocompleter(self, who_called: str):
+        """Remembers the input data of (sample code, concentration) pairs
+        and brings the remembered value of concentration for each remembered
+        sample code.
+        
+        Underlying methods allow for deleting remembered values by navigaing
+        the dropdown and clicking Delete key.
+
+        Args:
+            who_called (str): Discriminator of what should be remembered or brought
+            to the user.
+            
+                'code' means that the original sample code will be remembered and already
+            existing one will display the value of concentration that was saved with the sample code
+            
+                'conc' means that the previous value of concentration will be replaced with the 
+            current one, or (if the current code sample is empty string) the case is skipped 
+            and no action is taken.
+        """
+        samp_code = self.codeOfSample_lineEdit.text()
+        conc_val = self.concentration_dataSavingTab_doubleSpinBox.value()
+        compl = self.codeOfSample_lineEdit.completer
+        
+        match who_called:
+            case "code":
+                if samp_code not in compl.dict_data:
+                    compl.add(samp_code, conc_val)
+                else:
+                    self.concentration_dataSavingTab_doubleSpinBox.setValue(compl.dict_data[samp_code])
+            case "conc":
+                if samp_code in compl.dict_data:
+                    compl.add(samp_code, conc_val)
+                else:
+                    return
+            
 # THREAD CONTROLS
     def print_output(self, returned_value):
         # print(returned_value)
@@ -2157,7 +2188,7 @@ class Window(QtWidgets.QMainWindow):
         return worker
 
 # DIALOG BOXES
-    def showdialog(self, msg_type:str, message:str, kwargs={}):
+    def showdialog(self, msg_type: str, message: str, kwargs={}):
         '''
         Message type (msg_type) is one of these: 'Error', 'Warning', 'Info'
         '''
@@ -2546,7 +2577,7 @@ class Fitting():
         return [w*((yn-yi)**2) for w,yn,yi in zip(weights,ynew,self.ydata)] # SSE
 
     # The actual processor for automatic fitting
-    def automatic(self, z_range, ftype:str, stype:str, line_xydata):
+    def automatic(self, z_range, ftype: str, stype: str, line_xydata):
         self.z_range = z_range
 
         if (ftype == "Solvent" and window.solventCA_customBeamwaist_checkBox.isChecked() is False):#\

@@ -9,3 +9,4 @@ packages/thorlabs_apt/__pycache__/__init__.cpython-311.pyc
 packages/thorlabs_apt/__pycache__/_APTAPI.cpython-311.pyc
 packages/thorlabs_apt/__pycache__/_error_codes.cpython-311.pyc
 packages/thorlabs_apt/__pycache__/core.cpython-311.pyc
+python_project.code-workspace
