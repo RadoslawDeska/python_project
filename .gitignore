@@ -1,12 +1,4 @@
 lib/__pycache__/
 data/
-lib/__pycache__/cursors.cpython-311.pyc
-lib/__pycache__/figure.cpython-311.pyc
-lib/__pycache__/mgmotor.cpython-311.pyc
-lib/__pycache__/settings.cpython-311.pyc
-lib/__pycache__/worker.cpython-311.pyc
-packages/thorlabs_apt/__pycache__/__init__.cpython-311.pyc
-packages/thorlabs_apt/__pycache__/_APTAPI.cpython-311.pyc
-packages/thorlabs_apt/__pycache__/_error_codes.cpython-311.pyc
-packages/thorlabs_apt/__pycache__/core.cpython-311.pyc
+packages/thorlabs_apt/__pycache__/
 python_project.code-workspace

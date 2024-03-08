@@ -650,7 +650,7 @@ background-color:#aaa;border:2px solid #666;
                 <item row="1" column="2" rowspan="6">
                  <widget class="QFrame" name="frame_2">
                   <property name="sizePolicy">
-                   <sizepolicy hsizetype="MinimumExpanding" vsizetype="MinimumExpanding">
+                   <sizepolicy hsizetype="MinimumExpanding" vsizetype="Minimum">
                     <horstretch>0</horstretch>
                     <verstretch>0</verstretch>
                    </sizepolicy>
@@ -658,11 +658,11 @@ background-color:#aaa;border:2px solid #666;
                   <property name="minimumSize">
                    <size>
                     <width>118</width>
-                    <height>0</height>
+                    <height>179</height>
                    </size>
                   </property>
                   <property name="frameShape">
-                   <enum>QFrame::StyledPanel</enum>
+                   <enum>QFrame::NoFrame</enum>
                   </property>
                   <property name="frameShadow">
                    <enum>QFrame::Raised</enum>
@@ -676,8 +676,8 @@ background-color:#aaa;border:2px solid #666;
                    </property>
                    <item row="3" column="1">
                     <widget class="QDoubleSpinBox" name="zscanRange_measurementTab_doubleSpinBox">
-                     <property name="focusPolicy">
-                      <enum>Qt::NoFocus</enum>
+                     <property name="enabled">
+                      <bool>false</bool>
                      </property>
                      <property name="contextMenuPolicy">
                       <enum>Qt::NoContextMenu</enum>
@@ -687,9 +687,6 @@ background-color:#aaa;border:2px solid #666;
                      </property>
                      <property name="locale">
                       <locale language="English" country="UnitedStates"/>
-                     </property>
-                     <property name="readOnly">
-                      <bool>true</bool>
                      </property>
                      <property name="buttonSymbols">
                       <enum>QAbstractSpinBox::NoButtons</enum>
@@ -713,8 +710,8 @@ background-color:#aaa;border:2px solid #666;
                    </item>
                    <item row="1" column="1">
                     <widget class="QDoubleSpinBox" name="focalPoint_doubleSpinBox">
-                     <property name="focusPolicy">
-                      <enum>Qt::NoFocus</enum>
+                     <property name="enabled">
+                      <bool>false</bool>
                      </property>
                      <property name="contextMenuPolicy">
                       <enum>Qt::NoContextMenu</enum>
@@ -724,9 +721,6 @@ background-color:#aaa;border:2px solid #666;
                      </property>
                      <property name="locale">
                       <locale language="English" country="UnitedStates"/>
-                     </property>
-                     <property name="readOnly">
-                      <bool>true</bool>
                      </property>
                      <property name="buttonSymbols">
                       <enum>QAbstractSpinBox::NoButtons</enum>
@@ -747,6 +741,39 @@ background-color:#aaa;border:2px solid #666;
                       <double>55.000000000000000</double>
                      </property>
                     </widget>
+                   </item>
+                   <item row="0" column="0">
+                    <layout class="QHBoxLayout" name="horizontalLayout_2">
+                     <item>
+                      <widget class="QLabel" name="label_7">
+                       <property name="maximumSize">
+                        <size>
+                         <width>16777215</width>
+                         <height>50</height>
+                        </size>
+                       </property>
+                       <property name="text">
+                        <string>Starting position</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QRadioButton" name="extremes_radioButton">
+                       <property name="sizePolicy">
+                        <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                         <horstretch>0</horstretch>
+                         <verstretch>0</verstretch>
+                        </sizepolicy>
+                       </property>
+                       <property name="checked">
+                        <bool>true</bool>
+                       </property>
+                       <attribute name="buttonGroup">
+                        <string notr="true">buttonGroup</string>
+                       </attribute>
+                      </widget>
+                     </item>
+                    </layout>
                    </item>
                    <item row="3" column="0">
                     <widget class="QDoubleSpinBox" name="endPos_doubleSpinBox">
@@ -782,6 +809,56 @@ background-color:#aaa;border:2px solid #666;
                      </property>
                     </widget>
                    </item>
+                   <item row="5" column="0" colspan="2">
+                    <widget class="QSpinBox" name="stepsScan_spinBox">
+                     <property name="contextMenuPolicy">
+                      <enum>Qt::NoContextMenu</enum>
+                     </property>
+                     <property name="statusTip">
+                      <string>How many data points you want over the scan range.</string>
+                     </property>
+                     <property name="locale">
+                      <locale language="English" country="UnitedStates"/>
+                     </property>
+                     <property name="buttonSymbols">
+                      <enum>QAbstractSpinBox::NoButtons</enum>
+                     </property>
+                     <property name="minimum">
+                      <number>1</number>
+                     </property>
+                     <property name="maximum">
+                      <number>1000</number>
+                     </property>
+                     <property name="value">
+                      <number>200</number>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="7" column="0" colspan="2">
+                    <widget class="QSpinBox" name="samplesStep_spinBox">
+                     <property name="contextMenuPolicy">
+                      <enum>Qt::NoContextMenu</enum>
+                     </property>
+                     <property name="statusTip">
+                      <string>How many data samples are taken from detector at each data point.</string>
+                     </property>
+                     <property name="locale">
+                      <locale language="English" country="UnitedStates"/>
+                     </property>
+                     <property name="buttonSymbols">
+                      <enum>QAbstractSpinBox::NoButtons</enum>
+                     </property>
+                     <property name="minimum">
+                      <number>2</number>
+                     </property>
+                     <property name="maximum">
+                      <number>1000</number>
+                     </property>
+                     <property name="value">
+                      <number>200</number>
+                     </property>
+                    </widget>
+                   </item>
                    <item row="1" column="0">
                     <widget class="QDoubleSpinBox" name="startPos_doubleSpinBox">
                      <property name="contextMenuPolicy">
@@ -813,31 +890,38 @@ background-color:#aaa;border:2px solid #666;
                      </property>
                     </widget>
                    </item>
-                   <item row="2" column="0">
-                    <widget class="QLabel" name="label_8">
-                     <property name="maximumSize">
-                      <size>
-                       <width>16777215</width>
-                       <height>50</height>
-                      </size>
-                     </property>
-                     <property name="text">
-                      <string>Ending position</string>
-                     </property>
-                    </widget>
-                   </item>
                    <item row="0" column="1">
-                    <widget class="QLabel" name="label_72">
-                     <property name="maximumSize">
-                      <size>
-                       <width>16777215</width>
-                       <height>50</height>
-                      </size>
-                     </property>
-                     <property name="text">
-                      <string>Scan central position</string>
-                     </property>
-                    </widget>
+                    <layout class="QHBoxLayout" name="horizontalLayout_3">
+                     <item>
+                      <widget class="QLabel" name="label_72">
+                       <property name="maximumSize">
+                        <size>
+                         <width>16777215</width>
+                         <height>50</height>
+                        </size>
+                       </property>
+                       <property name="text">
+                        <string>Scan center</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QRadioButton" name="centerRange_radioButton">
+                       <property name="sizePolicy">
+                        <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                         <horstretch>0</horstretch>
+                         <verstretch>0</verstretch>
+                        </sizepolicy>
+                       </property>
+                       <property name="checked">
+                        <bool>false</bool>
+                       </property>
+                       <attribute name="buttonGroup">
+                        <string notr="true">buttonGroup</string>
+                       </attribute>
+                      </widget>
+                     </item>
+                    </layout>
                    </item>
                    <item row="2" column="1">
                     <widget class="QLabel" name="label_75">
@@ -852,8 +936,8 @@ background-color:#aaa;border:2px solid #666;
                      </property>
                     </widget>
                    </item>
-                   <item row="0" column="0">
-                    <widget class="QLabel" name="label_7">
+                   <item row="2" column="0">
+                    <widget class="QLabel" name="label_8">
                      <property name="maximumSize">
                       <size>
                        <width>16777215</width>
@@ -861,45 +945,7 @@ background-color:#aaa;border:2px solid #666;
                       </size>
                      </property>
                      <property name="text">
-                      <string>Starting position</string>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="4" column="0" colspan="2">
-                    <widget class="QLabel" name="label_9">
-                     <property name="maximumSize">
-                      <size>
-                       <width>16777215</width>
-                       <height>50</height>
-                      </size>
-                     </property>
-                     <property name="text">
-                      <string># steps per cycle (per scan)</string>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="5" column="0" colspan="2">
-                    <widget class="QSpinBox" name="stepsScan_spinBox">
-                     <property name="contextMenuPolicy">
-                      <enum>Qt::NoContextMenu</enum>
-                     </property>
-                     <property name="statusTip">
-                      <string>How many data points you want over the scan range.</string>
-                     </property>
-                     <property name="locale">
-                      <locale language="English" country="UnitedStates"/>
-                     </property>
-                     <property name="buttonSymbols">
-                      <enum>QAbstractSpinBox::NoButtons</enum>
-                     </property>
-                     <property name="minimum">
-                      <number>1</number>
-                     </property>
-                     <property name="maximum">
-                      <number>1000</number>
-                     </property>
-                     <property name="value">
-                      <number>200</number>
+                      <string>Ending position</string>
                      </property>
                     </widget>
                    </item>
@@ -916,31 +962,16 @@ background-color:#aaa;border:2px solid #666;
                      </property>
                     </widget>
                    </item>
-                   <item row="7" column="0" colspan="2">
-                    <widget class="QSpinBox" name="samplesStep_spinBox">
-                     <property name="contextMenuPolicy">
-                      <enum>Qt::NoContextMenu</enum>
+                   <item row="4" column="0" colspan="2">
+                    <widget class="QLabel" name="label_9">
+                     <property name="maximumSize">
+                      <size>
+                       <width>16777215</width>
+                       <height>50</height>
+                      </size>
                      </property>
-                     <property name="statusTip">
-                      <string>How many data samples are taken from detector at each data point.</string>
-                     </property>
-                     <property name="locale">
-                      <locale language="English" country="UnitedStates"/>
-                     </property>
-                     <property name="readOnly">
-                      <bool>true</bool>
-                     </property>
-                     <property name="buttonSymbols">
-                      <enum>QAbstractSpinBox::NoButtons</enum>
-                     </property>
-                     <property name="minimum">
-                      <number>2</number>
-                     </property>
-                     <property name="maximum">
-                      <number>1000</number>
-                     </property>
-                     <property name="value">
-                      <number>200</number>
+                     <property name="text">
+                      <string># steps per cycle (per scan)</string>
                      </property>
                     </widget>
                    </item>
@@ -2278,215 +2309,6 @@ QPushButton::enabled{
                       </item>
                      </layout>
                     </item>
-                    <item row="0" column="1">
-                     <layout class="QGridLayout" name="silicaCA_fittingsummary">
-                      <item row="1" column="0" colspan="2">
-                       <widget class="QLabel" name="label_62">
-                        <property name="text">
-                         <string>* Errors will be calculated upon autofitting</string>
-                        </property>
-                       </widget>
-                      </item>
-                      <item row="9" column="0">
-                       <widget class="QLabel" name="silica_rayleighRangeSummary_label">
-                        <property name="font">
-                         <font>
-                          <pointsize>10</pointsize>
-                         </font>
-                        </property>
-                        <property name="text">
-                         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;0.00 ± #.##&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                        </property>
-                        <property name="alignment">
-                         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                        </property>
-                       </widget>
-                      </item>
-                      <item row="8" column="0" colspan="2">
-                       <widget class="QLabel" name="label_51">
-                        <property name="font">
-                         <font>
-                          <pointsize>12</pointsize>
-                         </font>
-                        </property>
-                        <property name="text">
-                         <string>Rayleigh range for silica</string>
-                        </property>
-                       </widget>
-                      </item>
-                      <item row="4" column="0" colspan="2">
-                       <widget class="QLabel" name="label_49">
-                        <property name="font">
-                         <font>
-                          <pointsize>12</pointsize>
-                         </font>
-                        </property>
-                        <property name="text">
-                         <string>Laser Intensity</string>
-                        </property>
-                       </widget>
-                      </item>
-                      <item row="5" column="0">
-                       <widget class="QLabel" name="silica_laserIntensitySummary_label">
-                        <property name="font">
-                         <font>
-                          <pointsize>10</pointsize>
-                         </font>
-                        </property>
-                        <property name="text">
-                         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;0.00 ± #.##&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                        </property>
-                        <property name="alignment">
-                         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                        </property>
-                       </widget>
-                      </item>
-                      <item row="3" column="1">
-                       <widget class="QLabel" name="label_55">
-                        <property name="font">
-                         <font>
-                          <pointsize>10</pointsize>
-                         </font>
-                        </property>
-                        <property name="text">
-                         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;rad&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                        </property>
-                       </widget>
-                      </item>
-                      <item row="2" column="0" colspan="2">
-                       <widget class="QLabel" name="label_61">
-                        <property name="font">
-                         <font>
-                          <pointsize>12</pointsize>
-                         </font>
-                        </property>
-                        <property name="text">
-                         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;ΔΦ&lt;sub&gt;0&lt;/sub&gt;  of silica&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                        </property>
-                       </widget>
-                      </item>
-                      <item row="5" column="1">
-                       <widget class="QLabel" name="label_54">
-                        <property name="font">
-                         <font>
-                          <pointsize>10</pointsize>
-                         </font>
-                        </property>
-                        <property name="text">
-                         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;GW/cm&lt;span style=&quot; vertical-align:super;&quot;&gt;2&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                        </property>
-                       </widget>
-                      </item>
-                      <item row="3" column="0">
-                       <widget class="QLabel" name="silica_deltaPhi0Summary_label">
-                        <property name="font">
-                         <font>
-                          <pointsize>10</pointsize>
-                         </font>
-                        </property>
-                        <property name="text">
-                         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;0.00 ± #.##&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                        </property>
-                        <property name="alignment">
-                         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                        </property>
-                       </widget>
-                      </item>
-                      <item row="0" column="0" colspan="2">
-                       <widget class="QLabel" name="label_52">
-                        <property name="font">
-                         <font>
-                          <pointsize>15</pointsize>
-                         </font>
-                        </property>
-                        <property name="text">
-                         <string>Fitting summary</string>
-                        </property>
-                        <property name="alignment">
-                         <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
-                        </property>
-                       </widget>
-                      </item>
-                      <item row="7" column="0">
-                       <widget class="QLabel" name="silica_beamwaistSummary_label">
-                        <property name="font">
-                         <font>
-                          <pointsize>10</pointsize>
-                         </font>
-                        </property>
-                        <property name="text">
-                         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;0.00 ± #.##&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                        </property>
-                        <property name="alignment">
-                         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                        </property>
-                       </widget>
-                      </item>
-                      <item row="6" column="0" colspan="2">
-                       <widget class="QLabel" name="label_50">
-                        <property name="font">
-                         <font>
-                          <pointsize>12</pointsize>
-                         </font>
-                        </property>
-                        <property name="text">
-                         <string>Beamwaist for silica</string>
-                        </property>
-                       </widget>
-                      </item>
-                      <item row="9" column="1">
-                       <widget class="QLabel" name="label_59">
-                        <property name="font">
-                         <font>
-                          <pointsize>10</pointsize>
-                         </font>
-                        </property>
-                        <property name="text">
-                         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;mm&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                        </property>
-                       </widget>
-                      </item>
-                      <item row="7" column="1">
-                       <widget class="QLabel" name="label_56">
-                        <property name="font">
-                         <font>
-                          <pointsize>10</pointsize>
-                         </font>
-                        </property>
-                        <property name="text">
-                         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;μm&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                        </property>
-                       </widget>
-                      </item>
-                      <item row="11" column="0">
-                       <widget class="QLabel" name="numericalApertureSummary_label">
-                        <property name="font">
-                         <font>
-                          <pointsize>10</pointsize>
-                         </font>
-                        </property>
-                        <property name="text">
-                         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;0.00 ± #.##&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                        </property>
-                        <property name="alignment">
-                         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                        </property>
-                       </widget>
-                      </item>
-                      <item row="10" column="0" colspan="2">
-                       <widget class="QLabel" name="label_70">
-                        <property name="font">
-                         <font>
-                          <pointsize>12</pointsize>
-                         </font>
-                        </property>
-                        <property name="text">
-                         <string>Numerical aperture of the beam</string>
-                        </property>
-                       </widget>
-                      </item>
-                     </layout>
-                    </item>
                     <item row="1" column="1" rowspan="2">
                      <layout class="QGridLayout" name="gridLayout_34">
                       <item row="0" column="0">
@@ -2661,6 +2483,229 @@ QPushButton::enabled{
                        </spacer>
                       </item>
                      </layout>
+                    </item>
+                    <item row="0" column="1">
+                     <widget class="QFrame" name="silicaCA_fittingsummary_2">
+                      <property name="sizePolicy">
+                       <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                        <horstretch>0</horstretch>
+                        <verstretch>0</verstretch>
+                       </sizepolicy>
+                      </property>
+                      <property name="minimumSize">
+                       <size>
+                        <width>0</width>
+                        <height>280</height>
+                       </size>
+                      </property>
+                      <layout class="QGridLayout" name="silicaCA_fittingsummary">
+                       <item row="1" column="0" colspan="2">
+                        <widget class="QLabel" name="label_62">
+                         <property name="text">
+                          <string>* Errors will be calculated upon autofitting</string>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="9" column="0">
+                        <widget class="QLabel" name="silica_rayleighRangeSummary_label">
+                         <property name="font">
+                          <font>
+                           <pointsize>10</pointsize>
+                          </font>
+                         </property>
+                         <property name="text">
+                          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;0.00 ± #.##&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                         </property>
+                         <property name="alignment">
+                          <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="8" column="0" colspan="2">
+                        <widget class="QLabel" name="label_51">
+                         <property name="font">
+                          <font>
+                           <pointsize>12</pointsize>
+                          </font>
+                         </property>
+                         <property name="text">
+                          <string>Rayleigh range for silica</string>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="4" column="0" colspan="2">
+                        <widget class="QLabel" name="label_49">
+                         <property name="font">
+                          <font>
+                           <pointsize>12</pointsize>
+                          </font>
+                         </property>
+                         <property name="text">
+                          <string>Laser Intensity</string>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="5" column="0">
+                        <widget class="QLabel" name="silica_laserIntensitySummary_label">
+                         <property name="font">
+                          <font>
+                           <pointsize>10</pointsize>
+                          </font>
+                         </property>
+                         <property name="text">
+                          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;0.00 ± #.##&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                         </property>
+                         <property name="alignment">
+                          <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="3" column="1">
+                        <widget class="QLabel" name="label_55">
+                         <property name="font">
+                          <font>
+                           <pointsize>10</pointsize>
+                          </font>
+                         </property>
+                         <property name="text">
+                          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;rad&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="2" column="0" colspan="2">
+                        <widget class="QLabel" name="label_61">
+                         <property name="font">
+                          <font>
+                           <pointsize>12</pointsize>
+                          </font>
+                         </property>
+                         <property name="text">
+                          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;ΔΦ&lt;sub&gt;0&lt;/sub&gt;  of silica&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="5" column="1">
+                        <widget class="QLabel" name="label_54">
+                         <property name="font">
+                          <font>
+                           <pointsize>10</pointsize>
+                          </font>
+                         </property>
+                         <property name="text">
+                          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;GW/cm&lt;span style=&quot; vertical-align:super;&quot;&gt;2&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="3" column="0">
+                        <widget class="QLabel" name="silica_deltaPhi0Summary_label">
+                         <property name="font">
+                          <font>
+                           <pointsize>10</pointsize>
+                          </font>
+                         </property>
+                         <property name="text">
+                          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;0.00 ± #.##&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                         </property>
+                         <property name="alignment">
+                          <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="0" column="0" colspan="2">
+                        <widget class="QLabel" name="label_52">
+                         <property name="font">
+                          <font>
+                           <pointsize>15</pointsize>
+                          </font>
+                         </property>
+                         <property name="text">
+                          <string>Fitting summary</string>
+                         </property>
+                         <property name="alignment">
+                          <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="7" column="0">
+                        <widget class="QLabel" name="silica_beamwaistSummary_label">
+                         <property name="font">
+                          <font>
+                           <pointsize>10</pointsize>
+                          </font>
+                         </property>
+                         <property name="text">
+                          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;0.00 ± #.##&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                         </property>
+                         <property name="alignment">
+                          <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="6" column="0" colspan="2">
+                        <widget class="QLabel" name="label_50">
+                         <property name="font">
+                          <font>
+                           <pointsize>12</pointsize>
+                          </font>
+                         </property>
+                         <property name="text">
+                          <string>Beamwaist for silica</string>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="9" column="1">
+                        <widget class="QLabel" name="label_59">
+                         <property name="font">
+                          <font>
+                           <pointsize>10</pointsize>
+                          </font>
+                         </property>
+                         <property name="text">
+                          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;mm&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="7" column="1">
+                        <widget class="QLabel" name="label_56">
+                         <property name="font">
+                          <font>
+                           <pointsize>10</pointsize>
+                          </font>
+                         </property>
+                         <property name="text">
+                          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;μm&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="11" column="0">
+                        <widget class="QLabel" name="numericalApertureSummary_label">
+                         <property name="font">
+                          <font>
+                           <pointsize>10</pointsize>
+                          </font>
+                         </property>
+                         <property name="text">
+                          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;0.00 ± #.##&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                         </property>
+                         <property name="alignment">
+                          <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="10" column="0" colspan="2">
+                        <widget class="QLabel" name="label_70">
+                         <property name="font">
+                          <font>
+                           <pointsize>12</pointsize>
+                          </font>
+                         </property>
+                         <property name="text">
+                          <string>Numerical aperture of the beam</string>
+                         </property>
+                        </widget>
+                       </item>
+                      </layout>
+                     </widget>
                     </item>
                    </layout>
                   </item>
@@ -6743,21 +6788,21 @@ QPushButton::enabled{
              <item>
               <widget class="QFrame" name="generalParamsFrame">
                <property name="sizePolicy">
-                <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
                  <horstretch>0</horstretch>
                  <verstretch>0</verstretch>
                 </sizepolicy>
                </property>
                <property name="minimumSize">
                 <size>
-                 <width>208</width>
-                 <height>0</height>
+                 <width>240</width>
+                 <height>164</height>
                 </size>
                </property>
                <property name="maximumSize">
                 <size>
                  <width>16777215</width>
-                 <height>208</height>
+                 <height>240</height>
                 </size>
                </property>
                <property name="focusPolicy">
@@ -7260,7 +7305,7 @@ QPushButton::enabled{
     <property name="title">
      <string>&amp;File</string>
     </property>
-    <addaction name="actionLoadSolvents"/>
+    <addaction name="separator"/>
     <addaction name="actionExit"/>
    </widget>
    <widget class="QMenu" name="menuView">
@@ -7280,12 +7325,11 @@ QPushButton::enabled{
     <property name="title">
      <string>Settings</string>
     </property>
-    <addaction name="actionLoad"/>
-    <addaction name="actionSave"/>
-    <addaction name="actionSave_As"/>
+    <addaction name="actionLoadSettings"/>
+    <addaction name="actionSaveSettings"/>
+    <addaction name="actionSaveAsSettings"/>
     <addaction name="separator"/>
-    <addaction name="actionRestore_default"/>
-    <addaction name="actionOpen_editor"/>
+    <addaction name="actionRestoreDefaultSettings"/>
    </widget>
    <widget class="QMenu" name="menuHelp">
     <property name="enabled">
@@ -7297,7 +7341,22 @@ QPushButton::enabled{
     <addaction name="actionWalkthrough"/>
     <addaction name="actionAbout"/>
    </widget>
+   <widget class="QMenu" name="menuSamples">
+    <property name="title">
+     <string>Samples</string>
+    </property>
+    <addaction name="actionLoadSamples"/>
+    <addaction name="actionSaveSamples"/>
+   </widget>
+   <widget class="QMenu" name="menuSolvents">
+    <property name="title">
+     <string>Solvents</string>
+    </property>
+    <addaction name="actionLoadSolvents"/>
+   </widget>
    <addaction name="menuFile"/>
+   <addaction name="menuSamples"/>
+   <addaction name="menuSolvents"/>
    <addaction name="menuSettings"/>
    <addaction name="menuView"/>
    <addaction name="menuHelp"/>
@@ -7320,20 +7379,20 @@ QPushButton::enabled{
   </action>
   <action name="actionLoadSolvents">
    <property name="text">
-    <string>Load solvents</string>
+    <string>Load</string>
    </property>
   </action>
-  <action name="actionLoad">
+  <action name="actionLoadSettings">
    <property name="text">
     <string>Load</string>
    </property>
   </action>
-  <action name="actionRestore_default">
+  <action name="actionRestoreDefaultSettings">
    <property name="text">
     <string>Restore default</string>
    </property>
   </action>
-  <action name="actionSave">
+  <action name="actionSaveSettings">
    <property name="text">
     <string>Save</string>
    </property>
@@ -7353,9 +7412,19 @@ QPushButton::enabled{
     <string>About</string>
    </property>
   </action>
-  <action name="actionSave_As">
+  <action name="actionSaveAsSettings">
    <property name="text">
     <string>Save As</string>
+   </property>
+  </action>
+  <action name="actionLoadSamples">
+   <property name="text">
+    <string>Load</string>
+   </property>
+  </action>
+  <action name="actionSaveSamples">
+   <property name="text">
+    <string>Save</string>
    </property>
   </action>
  </widget>
@@ -7478,4 +7547,7 @@ QPushButton::enabled{
  </tabstops>
  <resources/>
  <connections/>
+ <buttongroups>
+  <buttongroup name="buttonGroup"/>
+ </buttongroups>
 </ui>

@@ -8,44 +8,64 @@ M. G. Kuzyk and C. W. Dirk, Eds., page 655-692, Marcel Dekker, Inc., 1998
 """
 
 __author__ = "Radosław Deska"
-__version__ = '0.1.4'
+__version__ = '0.1.5'
 
+# CHANGES AFTER 0.1.4
+# 1) SCRIPT LOGICS:
+#      - fixed long time to load (moved import thorlabs_apt to lazily load only after INITIALIZE button click)
+#      - moved all Z-scan theory-related classes to external files
+#      - cleaned imports
+#      - settings logics cleanup
+# 2) SETTINGS:
+#      - added "load settings" functionality
+#      - added loading last settings by default
+# 3) SAMPLES:
+#      - added "load" and "save" samples to file functionality
+#          (now the user can not only rely on current session samples list
+#           but can add to the list the samples from a file and
+#           update the file with current list of samples)
+#          (this is more cross-session user-friendliness)
+# 4) GUI:
+#      - fixed long time to load (moved import thorlabs_apt to lazily load only after INITIALIZE button click)
+#      - added range selection selector radio buttons
+#      - fixed exit dialogbox ("No" now ignores the close event)
+
+# import time
+# # t_start = time.perf_counter()
+import argparse
+# import cProfile
+import functools
 import json
 import logging
 import os
+# import pstats
 import re
 import sys
 import time
 import traceback
 import winsound
 from datetime import datetime
-from math import factorial
 from typing import Tuple
 
 import matplotlib
 import nidaqmx
 import numpy as np
-from lmfit import Minimizer, Parameters  #, fit_report
-from nidaqmx.constants import AcquisitionType, Edge
-from nidaqmx import stream_readers  # noqa: F401
-from numpy.typing import NDArray
-from PyQt5 import QtCore, QtGui, QtWidgets, uic
-from PyQt5.QtCore import QFile, QFileInfo, QObject, QSettings, QThreadPool, QTimer
-from PyQt5.QtGui import QColor, QPalette
-from PyQt5.QtWidgets import QFileDialog, QMessageBox, QSlider
-from scipy.signal import medfilt
-from scipy.special import hyp2f1
-from sigfig import round as error_rounding
-
-from lib.settings import *  # noqa: F403
 from lib.cursors import BlittedCursor
 from lib.figure import MplCanvas
 from lib.mgmotor import MG17Motor
-# from lib.scientific_rounding import error_rounding
+from lib.settings import *  # noqa: F403
+from lib.theory import Fitting, Integration
 from lib.worker import Worker
+from nidaqmx import stream_readers  # noqa: F401
+from nidaqmx.constants import AcquisitionType, Edge
+from numpy.typing import NDArray
 
-from packages import thorlabs_apt as apt  # importing it from custom location allows to place APT.dll
-                                          # in the package directory to read it (it is more user-friendly)
+from PyQt5 import QtCore, QtGui, QtWidgets, uic
+from PyQt5.QtCore import QObject, QSettings, QThreadPool, QTimer
+from PyQt5.QtGui import QColor, QPalette
+from PyQt5.QtWidgets import QFileDialog, QMessageBox, QSlider
+from scipy.signal import medfilt
+from sigfig import round as error_rounding                                        
 
 matplotlib.rcParams.update({'font.size': 7})
 #from matplotlib.widgets import BlittedCursor
@@ -72,31 +92,24 @@ SIG_FIG_MAN_FIT = 3  # number of significant digits in rounding values while man
 # 3. linters: black, mypy (typing), ruff
 # 4. Flow -> think in terms of data flow (functional programming)
 
+def time_it(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start_time = time.perf_counter()
+        result = func(*args, **kwargs)
+        end_time = time.perf_counter()
+        print(f"Function {func.__name__} took {end_time - start_time:.6f} seconds to run")
+        return result
+    return wrapper
+
 class Window(QtWidgets.QMainWindow):
 # INITIALIZATION
     def __init__(self, settings):
         super(Window, self).__init__()
-        ensure_default_settings_file()  # noqa: F405
+        self.settings = QSettings(settings, QSettings.IniFormat)
         
-        # Check if initialized settings file exists and can be modified by the program       
-        info = QFileInfo(settings)
-        if QFile(settings).exists() and bool(info.permissions() & QFile.WriteUser):
-            # if file exists and is writable            
-            self.settings = QSettings(settings, QSettings.IniFormat)
-        else:
-            # create settings file that will be modifiable
-            with open(os.path.join(os.path.dirname(__file__), "settings.ini"), mode="w", encoding="utf-8") as fi:
-                fi.write(DEFAULT_SETTINGS_LINES)  # noqa: F405
-            self.settings = QSettings(os.path.join(os.path.dirname(__file__), "settings.ini"), QSettings.IniFormat)
-            write_settings_string(os.path.join(os.path.dirname(__file__), "settings.ini"),sort_settings(self.settings))  # noqa: F405
-                
-        try:
-            uic.loadUi(self.settings.value('UI/ui_path'), self)
-        except FileNotFoundError:
-            try:
-                uic.loadUi('window.ui', self)
-            except FileNotFoundError:
-                return "Program files corrupted. GUI is missing file."
+        if not self.load_GUI():
+            return
         
         self.solventOA_absorptionModel_label.setVisible(False)
         self.solventOA_absorptionModel_comboBox.setVisible(False)
@@ -118,6 +131,28 @@ class Window(QtWidgets.QMainWindow):
         
         # SHOW THE APP WINDOW
         self.show()
+
+    def load_GUI(self):
+        try:
+            from lib.window_gui import Ui_MainWindow
+            self.ui = Ui_MainWindow()
+            self.ui.setupUi(self)
+            
+            # Set the attributes of the Window object to be the same as the Ui_MainWindow object
+            for name in dir(self.ui):
+                if not name.startswith('__'):  # Ignore special methods
+                    setattr(self, name, getattr(self.ui, name))
+            return True
+            
+        except ModuleNotFoundError:
+            try:
+                uic.loadUi(self.settings.value('UI/ui_path'), self)
+            except FileNotFoundError:
+                try:
+                    uic.loadUi('window.ui', self)
+                except FileNotFoundError:
+                    self.showdialog("Error","Program files corrupted. GUI is missing file.")
+                    return False
 
     def timing_and_threading(self):
         self.timer=QTimer()
@@ -212,16 +247,19 @@ class Window(QtWidgets.QMainWindow):
         self.solvents = json.load(json_file)
         self.solventName_comboBox.addItems([key for key in sorted(self.solvents.keys())])
         self.solvent_autocomplete()
-            
+          
     def value_change_triggers(self):
             # Measurement Tab
         self.endPos_doubleSpinBox.editingFinished.connect(lambda: self.measurement_plot_rescale("end"))
         self.startPos_doubleSpinBox.editingFinished.connect(lambda: self.measurement_plot_rescale("start"))
+        self.focalPoint_doubleSpinBox.editingFinished.connect(lambda: self.measurement_plot_rescale("focal"))
+        self.zscanRange_measurementTab_doubleSpinBox.editingFinished.connect(lambda: self.measurement_plot_rescale("range"))
         self.stepsScan_spinBox.valueChanged.connect(self.measurement_plot_rescale)
-            
+        self.extremes_radioButton.toggled.connect(self.range_selection)
+        self.centerRange_radioButton.toggled.connect(self.range_selection)
             # Data saving Tab
-        self.codeOfSample_lineEdit.editingFinished.connect(lambda: self.sample_code_autocompleter("code"))
-        self.concentration_dataSavingTab_doubleSpinBox.editingFinished.connect(lambda: self.sample_code_autocompleter("conc"))
+        self.codeOfSample_lineEdit.editingFinished.connect(lambda: self.sample_autocomplete("code"))
+        self.concentration_dataSavingTab_doubleSpinBox.editingFinished.connect(lambda: self.sample_autocomplete("conc"))
             # Data fitting Tab
         self.solventName_comboBox.currentIndexChanged.connect(self.solvent_autocomplete)
         self.zscanRange_doubleSpinBox.editingFinished.connect(self.set_new_positions)
@@ -250,17 +288,20 @@ class Window(QtWidgets.QMainWindow):
         self.solventOA_zeroLevel_slider.valueChanged.connect(lambda: self.fit_manually(ftype="Solvent", stype="OA"))
         self.solventOA_T_slider.valueChanged.connect(lambda: self.fit_manually(ftype="Solvent", stype="OA"))
         self.solventOA_filterSize_slider.valueChanged.connect(lambda: self.reduce_noise_in_data(self.solvent_data_set, ftype="Solvent", stype="OA"))
-
+    
     def clicker_triggers(self):
         # Menu triggers
         # File
+        self.actionLoadSamples.triggered.connect(lambda: self.sample_autocomplete("file_open"))
+        self.actionSaveSamples.triggered.connect(lambda: self.sample_autocomplete("file_save"))
         self.actionLoadSolvents.triggered.connect(lambda: self.load_solvents(caller="LoadSolvents"))
-        self.actionExit.triggered.connect(self.closeEvent)
+        self.actionExit.triggered.connect(self.close)
         # Settings
-        # self.actionLoad.triggered.connect(lambda: pass)
-        self.actionSave.triggered.connect(lambda: save_settings(self,self.settings))  # noqa: F405
-        self.actionSave_As.triggered.connect(lambda: save_as(self,self.settings))  # noqa: F405
-        self.actionRestore_default.triggered.connect(lambda: apply_settings(self, QSettings(self.settings.value("UI/defaults_location"), QSettings.IniFormat)))  # noqa: F405
+        self.actionLoadSettings.triggered.connect(lambda: load_settings(self,user=True))  # noqa: F405
+        self.actionSaveSettings.triggered.connect(lambda: save_settings(self,self.settings))  # noqa: F405
+        self.actionSaveAsSettings.triggered.connect(lambda: save_as(self,self.settings))  # noqa: F405
+        self.actionRestoreDefaultSettings.triggered.connect(
+            lambda: apply_settings(self, QSettings(self.settings.value("UI/defaults_location"), QSettings.IniFormat)))  # noqa: F405
         # View
         self.actionLight.triggered.connect(self.changeSkinLight)
         self.actionDark.triggered.connect(self.changeSkinDark)
@@ -310,7 +351,7 @@ class Window(QtWidgets.QMainWindow):
         self.solventOA_isAbsorption_checkBox.stateChanged.connect(lambda: self.toggle_absorption_model(ftype="Solvent"))
         self.solventOA_absorptionModel_comboBox.currentIndexChanged.connect(lambda: self.toggle_saturation_model(ftype="Solvent"))
         self.solventOA_customCenterPoint_checkBox.stateChanged.connect(lambda: self.enable_custom('SolventCenterPoint'))
-        
+    
     def timer_triggers(self):  # started with Initalize button click
         self.timer.timeout.connect(self.motion_detection)
         
@@ -365,7 +406,7 @@ class Window(QtWidgets.QMainWindow):
         self.measurement_plot_rescale()
 
         # print('Canvas loaded')
-
+    
     def initialize_fitting_charts(self):
         # Silica chart
         self.silica_figure = MplCanvas(self)
@@ -423,6 +464,24 @@ class Window(QtWidgets.QMainWindow):
                                "Sample": {"CA": self.sampleCA_figure, "OA": self.sampleOA_figure}}
         
 # MOTOR NAVIGATION
+    def range_selection(self):
+        '''Activate and deactivate range selectors based on checked radio button selector'''
+        if self.extremes_radioButton.isChecked() is True:
+            # enable first pair of settings
+            self.startPos_doubleSpinBox.setEnabled(True)
+            self.endPos_doubleSpinBox.setEnabled(True)
+            # disable second pair of settings
+            self.focalPoint_doubleSpinBox.setEnabled(False)
+            self.zscanRange_measurementTab_doubleSpinBox.setEnabled(False)
+            
+        elif self.centerRange_radioButton.isChecked() is True:
+            # disable first pair of settings
+            self.startPos_doubleSpinBox.setEnabled(False)
+            self.endPos_doubleSpinBox.setEnabled(False)
+            # enable second pair of settings
+            self.focalPoint_doubleSpinBox.setEnabled(True)
+            self.zscanRange_measurementTab_doubleSpinBox.setEnabled(True)
+    
     def motion_detection(self):
         if self.initializing is True:
             self.clearLED_pushButton.setEnabled(False)
@@ -459,6 +518,9 @@ class Window(QtWidgets.QMainWindow):
                     
                     self.startPos_doubleSpinBox.setEnabled(False)
                     self.endPos_doubleSpinBox.setEnabled(False)
+                    self.focalPoint_doubleSpinBox.setEnabled(False)
+                    self.zscanRange_measurementTab_doubleSpinBox.setEnabled(False)
+                    
                     self.stepsScan_spinBox.setEnabled(False)
                     self.samplesStep_spinBox.setEnabled(False)
 
@@ -469,6 +531,9 @@ class Window(QtWidgets.QMainWindow):
 
                     self.startPos_doubleSpinBox.setEnabled(False)
                     self.endPos_doubleSpinBox.setEnabled(False)
+                    self.focalPoint_doubleSpinBox.setEnabled(False)
+                    self.zscanRange_measurementTab_doubleSpinBox.setEnabled(False)
+                    
                     self.stepsScan_spinBox.setEnabled(False)
                     self.samplesStep_spinBox.setEnabled(False)
 
@@ -479,6 +544,9 @@ class Window(QtWidgets.QMainWindow):
                     
                     self.startPos_doubleSpinBox.setEnabled(False)
                     self.endPos_doubleSpinBox.setEnabled(False)
+                    self.focalPoint_doubleSpinBox.setEnabled(False)
+                    self.zscanRange_measurementTab_doubleSpinBox.setEnabled(False)
+                    
                     self.stepsScan_spinBox.setEnabled(False)
                     self.samplesStep_spinBox.setEnabled(False)
 
@@ -487,8 +555,8 @@ class Window(QtWidgets.QMainWindow):
                     self.run_pushButton.setEnabled(True)
                     self.waitLED_pushButton.setEnabled(False)
 
-                    self.startPos_doubleSpinBox.setEnabled(True)
-                    self.endPos_doubleSpinBox.setEnabled(True)
+                    self.range_selection()
+                    
                     self.stepsScan_spinBox.setEnabled(True)
                     self.samplesStep_spinBox.setEnabled(True)
         
@@ -498,9 +566,14 @@ class Window(QtWidgets.QMainWindow):
         else:
             self.update_pushButton.setEnabled(True)
 
+    # @time_it
     def motor_detection_and_homing(self, *args, **kwargs):
         motor_id = int(self.settings.value("Hardware/thorlabs_motor_id"))
 
+        # only now (not on startup) import the package, because it takes a few seconds to load it
+        from packages import (
+            thorlabs_apt as apt)  # importing it from custom location allows to place APT.dll
+                                  # in the package directory to read it (it is more user-friendly)
         try:
             self.motor = apt.Motor(motor_id)
             self.ocx.configure(motor_id)
@@ -556,8 +629,10 @@ class Window(QtWidgets.QMainWindow):
 
         if reply == QMessageBox.Yes:
             save_settings(self,self.settings)  # noqa: F405
-            print('Program exited.')
-            sys.exit()
+            # print('Program exited.')
+            event.accept()
+        else:
+            event.ignore()
 
 # DATA ACQUISITION AND DISPLAY
     def measurement_clear(self):
@@ -595,13 +670,36 @@ class Window(QtWidgets.QMainWindow):
         If user changes the focus of chart at specific line, rescaling fits the charts
         to display the line in its min-max y-range.'''
         
+        s = self.startPos_doubleSpinBox.value()
+        e = self.endPos_doubleSpinBox.value()
+        f = self.focalPoint_doubleSpinBox.value()
+        z = self.zscanRange_measurementTab_doubleSpinBox.value()
+        
+        smin = self.startPos_doubleSpinBox.minimum()
+        emax = self.endPos_doubleSpinBox.maximum()
+        
         match who_called:
             case "start":
-                if self.startPos_doubleSpinBox.value() >= self.endPos_doubleSpinBox.value():
+                if s >= e:
                     self.startPos_doubleSpinBox.setValue(self.previous_start_pos)
             case "end":
-                if self.endPos_doubleSpinBox.value() <= self.startPos_doubleSpinBox.value():
+                if e <= s:
                     self.endPos_doubleSpinBox.setValue(self.previous_end_pos)
+            # The 'focal' and 'range' cases ensure that start and end positions are in range of motion
+            case "focal":
+                if f+z/2 > emax:
+                    self.zscanRange_measurementTab_doubleSpinBox.setValue(2*(emax-f))
+                    z = self.zscanRange_measurementTab_doubleSpinBox.value()
+                elif f-z/2 < smin:
+                    self.zscanRange_measurementTab_doubleSpinBox.setValue(2*f)
+                    z = self.zscanRange_measurementTab_doubleSpinBox.value()
+            case "range":
+                if f+z/2 > emax:
+                    self.focalPoint_doubleSpinBox.setValue(emax-z/2)
+                    f = self.focalPoint_doubleSpinBox.value()
+                elif f-z/2 < smin:
+                    self.focalPoint_doubleSpinBox.setValue(z/2)
+                    f = self.focalPoint_doubleSpinBox.value()
             
             case _: # if the who_called value is any of the values in the list of "Focus At" dropdown OR "ANYTHING ELSE"
                 
@@ -640,12 +738,16 @@ class Window(QtWidgets.QMainWindow):
 
                     chart.draw_idle()
         
-        self.focalPoint_doubleSpinBox.setValue((self.endPos_doubleSpinBox.value()+self.startPos_doubleSpinBox.value())/2)
-        self.zscanRange_measurementTab_doubleSpinBox.setValue(np.abs(self.endPos_doubleSpinBox.value()-self.startPos_doubleSpinBox.value()))
+        if self.extremes_radioButton.isChecked() is True:
+            self.focalPoint_doubleSpinBox.setValue((e+s)/2)
+            self.zscanRange_measurementTab_doubleSpinBox.setValue(np.abs(e-s))
+        elif self.centerRange_radioButton.isChecked() is True:
+            self.startPos_doubleSpinBox.setValue(f-z/2)
+            self.endPos_doubleSpinBox.setValue(f+z/2)
 
-        self.offset = (self.endPos_doubleSpinBox.value()-self.startPos_doubleSpinBox.value())/self.stepsScan_spinBox.value()
+        self.offset = (e-s)/self.stepsScan_spinBox.value()
         for chart in self.charts.values():
-            chart.axes.set_xlim(self.startPos_doubleSpinBox.value()-self.offset, self.endPos_doubleSpinBox.value()+self.offset)
+            chart.axes.set_xlim(s-self.offset, e+self.offset)
             
             chart.axes.relim()
             chart.draw_idle()
@@ -1956,8 +2058,8 @@ class Window(QtWidgets.QMainWindow):
 
                 line_data = line.get_data()
                 
-                self.silica_calculation = Fitting(self.silica_curves, self.silica_DPhi0, self.silica_beamwaist, self.silica_zeroLevel, self.silica_centerPoint,self.silica_nop,line_data[1])
-                self.silica_calculation = Fitting(self.silica_curves, self.silica_DPhi0, self.silica_beamwaist, self.silica_zeroLevel, self.silica_centerPoint,self.silica_nop,line_data[1])
+                self.silica_calculation = Fitting(self,self.silica_curves, self.silica_DPhi0, self.silica_beamwaist, self.silica_zeroLevel, self.silica_centerPoint,self.silica_nop,line_data[1])
+                self.silica_calculation = Fitting(self,self.silica_curves, self.silica_DPhi0, self.silica_beamwaist, self.silica_zeroLevel, self.silica_centerPoint,self.silica_nop,line_data[1])
                 minimizer_result, self.result = self.silica_calculation.automatic(self.z_range, ftype, stype, line_data)
                 # Make sure that the result doesn't contain NoneTypes
                 for key in minimizer_result.params.keys():
@@ -1989,8 +2091,8 @@ class Window(QtWidgets.QMainWindow):
                 self.solvent_nop = len(self.solvent_data_set[0])
                 self.solvent_data_set[0] = np.array([(self.z_range*zz/self.solvent_nop-self.z_range/2)*1000 for zz in range(self.solvent_nop)]) # [mm] update positions with newly-read Z-scan range value
                 
-                self.solvent_calculation = Fitting(self.solvent_curves, self.solvent_DPhi0, self.solvent_beamwaist, self.solventCA_zeroLevel, self.solventCA_centerPoint,self.solvent_nop,line_data[1])
-                self.solvent_calculation = Fitting(self.solvent_curves, self.solvent_DPhi0, self.solvent_beamwaist, self.solventCA_zeroLevel, self.solventCA_centerPoint,self.solvent_nop,line_data[1])
+                self.solvent_calculation = Fitting(self,self.solvent_curves, self.solvent_DPhi0, self.solvent_beamwaist, self.solventCA_zeroLevel, self.solventCA_centerPoint,self.solvent_nop,line_data[1])
+                self.solvent_calculation = Fitting(self,self.solvent_curves, self.solvent_DPhi0, self.solvent_beamwaist, self.solventCA_zeroLevel, self.solventCA_centerPoint,self.solvent_nop,line_data[1])
                 minimizer_result, self.result = self.solvent_calculation.automatic(self.z_range, ftype, stype, line_data)
                 match stype:
                     case "CA":
@@ -2045,8 +2147,8 @@ class Window(QtWidgets.QMainWindow):
                     line = self.silica_figure.axes.get_lines()[0]
                     line_data = line.get_ydata()
                     
-                    self.silica_curves = Integration(SILICA_BETA,self.silica_n2,self.silica_DPhi0,self.silica_data_set[0],self.d0,self.ra,self.lda,self.silica_beamwaist,N_COMPONENTS,INTEGRATION_STEPS)
-                    self.silica_calculation = Fitting(self.silica_curves, self.silica_DPhi0, self.silica_beamwaist, self.silica_zeroLevel, self.silica_centerPoint,len(self.silica_data_set[0]),line_data)
+                    self.silica_curves = Integration(self,SILICA_BETA,self.silica_n2,self.silica_DPhi0,self.silica_data_set[0],self.d0,self.ra,self.lda,self.silica_beamwaist,N_COMPONENTS,INTEGRATION_STEPS)
+                    self.silica_calculation = Fitting(self,self.silica_curves, self.silica_DPhi0, self.silica_beamwaist, self.silica_zeroLevel, self.silica_centerPoint,len(self.silica_data_set[0]),line_data)
                     self.result = self.silica_calculation.manual(self.silica_zeroLevel, self.silica_centerPoint, self.silica_DPhi0, self.silica_beamwaist, self.z_range)
                     self.silica_autofit_done = False
             case "Solvent":
@@ -2055,22 +2157,22 @@ class Window(QtWidgets.QMainWindow):
                     line = self.solventCA_figure.axes.get_lines()[0]
                     line_data = line.get_ydata()
                                     
-                    self.solvent_curves = Integration(0,self.solvent_n2,self.solvent_DPhi0,self.solvent_data_set[0],self.d0,self.ra,self.lda,self.solvent_beamwaist,N_COMPONENTS,INTEGRATION_STEPS) # solvent_beta = 0
-                    self.solvent_calculation = Fitting(self.solvent_curves, self.solvent_DPhi0, self.solvent_beamwaist, self.solventCA_zeroLevel, self.solventCA_centerPoint,len(self.solvent_data_set[0]),line_data)
+                    self.solvent_curves = Integration(self,0,self.solvent_n2,self.solvent_DPhi0,self.solvent_data_set[0],self.d0,self.ra,self.lda,self.solvent_beamwaist,N_COMPONENTS,INTEGRATION_STEPS) # solvent_beta = 0
+                    self.solvent_calculation = Fitting(self,self.solvent_curves, self.solvent_DPhi0, self.solvent_beamwaist, self.solventCA_zeroLevel, self.solventCA_centerPoint,len(self.solvent_data_set[0]),line_data)
                     self.result = self.solvent_calculation.manual(self.solventCA_zeroLevel, self.solventCA_centerPoint, self.solvent_DPhi0, self.solvent_beamwaist, self.z_range)
-                    self.solvent_curves = Integration(0,self.solvent_n2,self.solvent_DPhi0,self.solvent_data_set[0],self.d0,self.ra,self.lda,self.solvent_beamwaist,N_COMPONENTS,INTEGRATION_STEPS) # solvent_beta = 0
-                    self.solvent_calculation = Fitting(self.solvent_curves, self.solvent_DPhi0, self.solvent_beamwaist, self.solventCA_zeroLevel, self.solventCA_centerPoint,len(self.solvent_data_set[0]),line_data)
+                    self.solvent_curves = Integration(self,0,self.solvent_n2,self.solvent_DPhi0,self.solvent_data_set[0],self.d0,self.ra,self.lda,self.solvent_beamwaist,N_COMPONENTS,INTEGRATION_STEPS) # solvent_beta = 0
+                    self.solvent_calculation = Fitting(self,self.solvent_curves, self.solvent_DPhi0, self.solvent_beamwaist, self.solventCA_zeroLevel, self.solventCA_centerPoint,len(self.solvent_data_set[0]),line_data)
                     self.result = self.solvent_calculation.manual(self.solventCA_zeroLevel, self.solventCA_centerPoint, self.solvent_DPhi0, self.solvent_beamwaist, self.z_range)
                     self.solventCA_autofit_done = False
                 # elif stype == "OA":
                 #     line = self.solventOA_figure.axes.get_lines()[0]
                 #     line_data = line.get_ydata()
 
-                #     self.solvent_curves = Integration(self.solventOA_T_doubleSpinBox.value(),self.solvent_n2,0,self.solvent_data_set[0],self.d0,self.ra,self.lda,self.solvent_beamwaist,N_COMPONENTS,INTEGRATION_STEPS, stype="OA")
-                #     self.solvent_calculation = Fitting(self.solvent_curves, 0, self.solvent_beamwaist, self.solventOA_zeroLevel, self.solventOA_centerPoint,len(self.solvent_data_set[0]),line_data)
+                #     self.solvent_curves = Integration(self,self.solventOA_T_doubleSpinBox.value(),self.solvent_n2,0,self.solvent_data_set[0],self.d0,self.ra,self.lda,self.solvent_beamwaist,N_COMPONENTS,INTEGRATION_STEPS, stype="OA")
+                #     self.solvent_calculation = Fitting(self,self.solvent_curves, 0, self.solvent_beamwaist, self.solventOA_zeroLevel, self.solventOA_centerPoint,len(self.solvent_data_set[0]),line_data)
                 #     self.result = self.solvent_calculation.manual(self.solventOA_zeroLevel, self.solventOA_centerPoint, 0, self.solvent_beamwaist, self.z_range, stype)
-                #     self.solvent_curves = Integration(self.solventOA_T_doubleSpinBox.value(),self.solvent_n2,0,self.solvent_data_set[0],self.d0,self.ra,self.lda,self.solvent_beamwaist,N_COMPONENTS,INTEGRATION_STEPS, stype="OA")
-                #     self.solvent_calculation = Fitting(self.solvent_curves, 0, self.solvent_beamwaist, self.solventOA_zeroLevel, self.solventOA_centerPoint,len(self.solvent_data_set[0]),line_data)
+                #     self.solvent_curves = Integration(self,self.solventOA_T_doubleSpinBox.value(),self.solvent_n2,0,self.solvent_data_set[0],self.d0,self.ra,self.lda,self.solvent_beamwaist,N_COMPONENTS,INTEGRATION_STEPS, stype="OA")
+                #     self.solvent_calculation = Fitting(self,self.solvent_curves, 0, self.solvent_beamwaist, self.solventOA_zeroLevel, self.solventOA_centerPoint,len(self.solvent_data_set[0]),line_data)
                 #     self.result = self.solvent_calculation.manual(self.solventOA_zeroLevel, self.solventOA_centerPoint, 0, self.solvent_beamwaist, self.z_range, stype)
                 
                 #     self.draw_fitting_line(ftype,stype)
@@ -2128,7 +2230,7 @@ class Window(QtWidgets.QMainWindow):
         self.solventDensity_lineEdit.setText(str(self.solvents[self.solventName_comboBox.currentText()]["density"])+' g/cm3')
         self.solventRefrIdx_lineEdit.setText(str(self.solvents[self.solventName_comboBox.currentText()]["index"]))
 
-    def sample_code_autocompleter(self, who_called: str):
+    def sample_autocomplete(self, who_called: str):
         """Remembers the input data of (sample code, concentration) pairs
         and brings the remembered value of concentration for each remembered
         sample code.
@@ -2162,6 +2264,33 @@ class Window(QtWidgets.QMainWindow):
                     compl.add(samp_code, conc_val)
                 else:
                     return
+            
+            case "file_open":
+                cwd = os.path.join(os.path.abspath(os.path.dirname(__file__)))
+                reply = QMessageBox.question(self,"Warning",
+                                     "Duplicated values will be replaced. Do you wish to continue?",
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+                if reply == QMessageBox.Yes:
+                    path, _ = QFileDialog.getOpenFileName(self, "Load Samples", cwd, filter="JSON file (*.json)")
+                
+                    if path:
+                        with open(path) as f:
+                            try:
+                                file_content = json.load(f,parse_float=float)
+                            except json.decoder.JSONDecodeError:
+                                return
+                            
+                            for key, value in file_content.items():
+                                compl.add(key,value)
+            
+            case "file_save":
+                cwd = os.path.join(os.path.abspath(os.path.dirname(__file__)))
+                path, _ = QFileDialog.getSaveFileName(self, "Save Samples", cwd, filter="JSON file (*.json)")
+                
+                if path:
+                    with open(path, 'w', encoding='utf-8') as output_file:
+                        non_empty_dict = {k: v for k, v in compl.dict_data.items() if k != ''}
+                        json.dump(non_empty_dict, output_file, indent=4)
             
 # THREAD CONTROLS
     def print_output(self, returned_value):
@@ -2234,6 +2363,38 @@ class Window(QtWidgets.QMainWindow):
         if hasattr(self,"INACTIVE_SOLVENT_TAB_2"):
             self.INACTIVE_SOLVENT_TAB_2.setStyleSheet("QLabel { background-color: rgb(47, 47, 52)}")
         
+        # Radio Buttons Customization
+        size = self.style().pixelMetric(QtWidgets.QStyle.PM_ExclusiveIndicatorWidth)
+        border = 1
+        for rb in [self.extremes_radioButton,self.centerRange_radioButton]:
+            rb.setStyleSheet('''
+                QRadioButton::indicator {{
+                    border: {border}px solid rgb(26, 26, 30); 
+                    height: {size}px;
+                    width: {size}px;
+                    border-radius: {radius}px;
+                }}
+                QRadioButton::indicator:checked {{
+                    background: qradialgradient(
+                        cx:.5, cy:.5, radius: {innerRatio},
+                        fx:.5, fy:.5,
+                        stop:0 {checkColor}, 
+                        stop:0.29 {checkColor},
+                        stop:0.3 rgb(60, 60, 65),
+                        stop:1 rgb(60, 60, 65)
+                        );
+                }}
+                QRadioButton::indicator:focus {{
+                    outline: none;
+                }}
+            '''.format(
+                size=size - border * 2, 
+                border=border, 
+                radius=size // 2, 
+                innerRatio=1 - (border * 2 + 1) / size, 
+                checkColor='rgb(42, 130, 218)'
+            ))
+        
         # Measurement Tab Charts
         self.rms_text.set_color("white")
         self.rms_text.set_bbox(dict(boxstyle='round', facecolor=(60/255,60/255,65/255), edgecolor=(200/255,200/255,200/255), alpha=1))
@@ -2290,6 +2451,38 @@ class Window(QtWidgets.QMainWindow):
         if hasattr(self,"INACTIVE_SOLVENT_TAB_2"):
             self.INACTIVE_SOLVENT_TAB_2.setStyleSheet("QLabel { background-color: rgb(252, 252, 252)}")
         
+        # Radio Buttons Customization
+        size = self.style().pixelMetric(QtWidgets.QStyle.PM_ExclusiveIndicatorWidth)
+        border = 1
+        for rb in [self.extremes_radioButton,self.centerRange_radioButton]:
+            rb.setStyleSheet('''
+                QRadioButton::indicator {{
+                    border: {border}px solid rgb(26, 26, 30); 
+                    height: {size}px;
+                    width: {size}px;
+                    border-radius: {radius}px;
+                }}
+                QRadioButton::indicator:checked {{
+                    background: qradialgradient(
+                        cx:.5, cy:.5, radius: {innerRatio},
+                        fx:.5, fy:.5,
+                        stop:0 {checkColor}, 
+                        stop:0.29 {checkColor},
+                        stop:0.3 rgb(255,255,255),
+                        stop:1 rgb(255,255,255)
+                        );
+                }}
+                QRadioButton::indicator:focus {{
+                    outline: none;
+                }}
+            '''.format(
+                size=size - border * 2, 
+                border=border, 
+                radius=size // 2, 
+                innerRatio=1 - (border * 2 + 1) / size, 
+                checkColor='rgb(42, 130, 218)'
+            ))
+        
         # Measurement Tab Charts
         self.rms_text.set_color("black")
         self.rms_text.set_bbox(dict(boxstyle='round', facecolor="white", edgecolor="black", alpha=1))
@@ -2339,337 +2532,7 @@ class Window(QtWidgets.QMainWindow):
 
         self.setStyleSheet(stylesheet)
             
-## OTHER CLASSES
-class Integration():
-    '''Integrates the electric field according to procedure from Sheik-Bahae, given the initial parameters'''
-    def __init__(self, beta, n2, DPhi0, positions, d0, aperture_radius, wavelength, beamwaist, n_components, integration_steps, stype="CA"):
-        super(Integration, self).__init__()
-
-        # Data range
-        self.z = positions # evenly spaced
-
-        # Apertures and distances
-        self.d0 = d0 # distance from z=0 to the aperture plane
-        self.ra = aperture_radius # in meters
-
-        # Beam properties
-        self.lda = wavelength # in meters
-        self.w0 = beamwaist # in meters
-
-        # Sample properties
-        self.n2 = n2 # non-linear refractive index
-        try:
-            self.T = beta*self.lda/self.n2 # non-linear transmittance
-        except ZeroDivisionError:
-            self.T = 0
-        self.DPhi0 = DPhi0 # on-axis phase shift in z=0
-        
-        # Integration parameters
-        self.mm = n_components # number of electric field components (for Gaussian decomposition)
-        self.ir = integration_steps
-        
-        self.stype = stype
-        self.derive(self.DPhi0, self.w0, self.d0, self.ra, stype)
-    
-    def derive(self, DPhi0, w0, d0, ra, stype):
-        '''1st method called. Called on __init__'''
-        # Beam properties
-        self.k = 2*np.pi/self.lda # wave vector in free space
-        self.z0 = 0.5*self.k*w0**2 # diffraction length of the beam
-        self.wa = w0*np.sqrt(1+d0**2/self.z0**2) # beam radius at the aperture plane
-
-        # Aperture radius
-        self.ra = ra
-
-        # Sample properties
-        self.Dphi0 = DPhi0/(1+self.z**2/self.z0**2)
-
-        # Additional derived parameters
-        self.wz = w0*np.sqrt(1+self.z**2/self.z0**2)
-
-        self.Rz = self.z+self.z0**2/self.z
-        self.d = d0-self.z
-        self.g = 1+self.d/self.Rz
-
-        match stype:
-            case "CA":
-                self.bigproduct()
-            case "OA":
-                self.calculate_Tz_for_OA(window.solventOA_absorptionModel_comboBox.currentText()) # CZYŻBY????????
-        
-    def calculate_Tz_for_OA(self, model):
-        '''2nd method called. Called by derive() for stype = "OA".'''
-        match window.fittingTabs.currentIndex():
-            case 0:
-                ftype = "Silica"
-            case 1:
-                ftype = "Solvent"
-            case 2:
-                ftype = "Sample"
-        
-        match ftype:
-            case "Silica":
-                return # Do not fit OA for silica
-            case "Solvent":
-                absorption_checkbox = window.solventOA_isAbsorption_checkBox.isChecked()
-            case "Sample":
-                absorption_checkbox = window.sampleOA_isAbsorption_checkBox.isChecked()
-        
-        if absorption_checkbox is False:
-            self.Tz = 0
-            # Psi_n = (n * beta_n * I0**n * L_eff)**(1/n) (n+1)-photon absorption
-            # Psi1 = T*DPhi0/2/pi
-            #Psi1 = self.T*self.DPhi0/(2*np.pi)
-            if self.T != 0:
-                #Psi1 = -(lambertw(-np.exp(-self.T)*self.T)-self.T)/self.T # Lambert W function calculates inverse of hyp2f1(1,1,2,-psi1) at self.z=0
-                Psi1 = self.T
-                #Psi2 = (2*window.laserI0*self.T*self.DPhi0/(2*np.pi))**(1/2)
-            else:
-                Psi1 = 0
-            
-            Psi2 = self.T*8 # 8 is a value out of the hat to obtain similar extreme point (valley or peak)
-            
-            match model:
-                case "2PA":
-                    psi1 = Psi1/(1+self.z**2/self.z0**2)
-                    # self.Tz = hyp2f1(1/n,1/n,(n+1)/n,-psi**n)
-                    self.Tz = hyp2f1(1,1,2,-psi1)
-                    pass
-                case "3PA":
-                    psi2 = Psi2/(1+self.z**2/self.z0**2)
-                    # self.Tz = hyp2f1(1/n,1/n,(n+1)/n,-psi**n)
-                    self.Tz = hyp2f1(1/2,1/2,3/2,-(psi2)**2)
-                
-                case "2PA+3PA":
-                    if Psi1 !=0:
-                        psi1 = Psi1/(1+self.z**2/self.z0**2)
-                        psi2 = Psi2/(1+self.z**2/self.z0**2)
-                        f_x_psi1_psi2 = 1+psi1*(0.339*np.sin(0.498*psi2)-0.029)/(1+0.966*psi1*psi2**-0.718) # coupling function formula from OPTICS EXPRESS Vol. 13, No. 23 9231
-                        self.Tz = hyp2f1(1,1,2,-psi1)*hyp2f1(1/2,1/2,3/2,-(psi2)**2)*f_x_psi1_psi2
-                    
-                    else:
-                        self.Tz = np.ones_like(self.z)
-                
-                case "RSA":
-                    self.Tz = np.ones_like(self.z)
-                    
-                case "SA":
-                    self.Tz = np.ones_like(self.z)
-                    
-                case "2PA+SA":
-                    self.Tz = np.ones_like(self.z)
-                    
-                case _:
-                    self.Tz = np.ones_like(self.z)
-            
-            self.Tznorm = 2*self.Tz/(np.average(self.Tz[0:10])+np.average(self.Tz[len(self.Tz)-10:]))
-        
-        else:
-            self.Tznorm = np.ones_like(self.z)
-
-        return self.Tznorm
-
-    def calculate_fm(self):
-        '''3rd method called. Called by bigproduct()'''
-        self.result = [(1j*self.Dphi0)**m/factorial(m)*self.product[m] for m in range(0,self.mm)]
-        return self.result
-
-    def bigproduct(self):
-        '''2nd method called. Called by derive() for stype = "CA".'''
-        # Big product operator (j from 1 to m)
-        # if self.beta == 0:
-        # self.product = np.ones(self.mm) # The result is already known. Uses numpy array for calculate_fm function to work properly
-
-        #else: # THIS MUST BE CALCULATED TO TAKE INTO ACCOUNT TRANSMITTANCE THROUGH THE APERTURE
-        self.product = []
-        for m in range(0,self.mm):
-            if m==0:
-                self.product.append(1)
-                continue # 0th value of m gives product=1 and in cumulative product it gives no contribution, so go to next iteration straight away.
-            else:
-                self.product.append(np.cumprod([1+1j*(j-1/2)/2/np.pi*self.T for j in range(1,m+1)])[-1]) # calculate cumulative product for given m
-        #                                                                                                                          # and make 'product' contain all m products
-        self.fm = self.calculate_fm()
-
-        Tzo = self.open() # Returns final result for OA
-        Tzc = self.closed() # Returns final result for CA
-        
-        self.Tznorm = Tzc/Tzo # This way, transmittance through aperture is taken into account
-    
-    def open(self):
-        '''4th method called. Called by bigproduct()'''
-        self.dr = 3*self.wa/self.ir # integration over radius step size
-        self.open_sum = self.bigsum()
-        return self.open_sum
-
-    def closed(self):
-        '''6th method called. Called by bigproduct()'''
-        self.dr = self.ra/self.ir # integration over radius step size
-        self.closed_sum = self.bigsum()
-        return self.closed_sum
-    
-    def bigsum(self):
-        '''5th and 7th method called. Called by open() and closed()'''
-        # Big sum operator (m from 0 to "infinity")
-        # integration over radius
-        
-        # Transmitted power
-        self.Tz = 0
-
-        for rr in range(self.ir):
-            self.E = 0
-            
-            for m in range(0,self.mm):
-                self.wm0 = self.wz/np.sqrt((2*m+1))
-                self.dm = 0.5*self.k*self.wm0**2
-                self.wm = self.wm0*np.sqrt(self.g**2+self.d**2/self.dm**2)
-                self.tm = np.arctan(self.g/(self.d/self.dm))
-                self.Rm = self.d/(1-self.g/(self.g**2+self.d**2/self.dm**2))
-
-                self.E += self.fm[m]*np.exp(1j*self.tm)*self.wm0/self.wm/self.wz*np.exp((-1/self.wm**2+1j*np.pi/self.lda/self.Rm)*(rr*self.dr)**2)
-        
-            self.Tz += np.abs(self.E)**2*rr*self.dr # transmittance through aperture plane
-        
-        # T(z)=P_T/(S*P_i), where S=1-exp(-2*ra^2/wa^2)
-        #S = 1-np.exp(-2*self.ra**2/self.wa**2)
-        #I0 - instantaneous laser fluence - this is missing (we want to get it)
-        #self.Tznorm = 3E8*8.854E-12*self.Tz/(S*self.w0**2/2*I0)
-        
-        # Normalize transmitted power before dividing CA/OA (the only way of normalization when we don't have I0)
-        self.Tznorm = 2*self.Tz/(np.average(self.Tz[0:10])+np.average(self.Tz[len(self.Tz)-10:]))
-
-        return self.Tznorm
-class Fitting():
-    def __init__(self, sample_type: Integration, amplitude, beamwaist, zero_level, centerpoint, nop, data):
-        super(Fitting, self).__init__()
-        self.sample_type = sample_type
-        self.amplitude = amplitude
-        self.beamwaist = beamwaist
-        self.zero_level = zero_level
-        self.centerpoint = centerpoint
-        self.nop = nop
-        self.ydata = data
-
-    # The parametrized function to be plotted. It is also initial guess for automatic fitting.
-    def manual(self, zero_level, centerpoint, amplitude, beamwaist, z_range, stype="CA") -> list:
-        '''Returns integrated field for given input parameters
-        
-        ONLY FOR n2 FOR NOW!!!!!!!!!!!!!'''
-        self.z_range = z_range # in meters
-        self.sample_type.z = np.array([self.z_range*(zz - centerpoint)/self.nop-self.z_range/2 for zz in range(self.nop)]) # in meters
-        window.get_general_parameters()
-        if stype == "CA":
-            self.sample_type.derive(amplitude,beamwaist,window.d0,window.ra,stype)
-            cas = self.sample_type.closed_sum # Tznorm
-            oas = self.sample_type.open_sum   # Tznorm
-            result = (cas/oas)+(zero_level-1)
-        elif stype == "OA":
-            self.sample_type.derive(amplitude,beamwaist,window.d0,window.ra,stype)
-            oas = self.sample_type.Tznorm
-            result = oas+(zero_level-1)
-        
-        return result
-
-    # The function to be minimized in automated fitting
-    def fcn2min(self,params,*weights):
-        pars = params.valuesdict().values()
-        ynew = self.manual(*pars)
-        return [w*((yn-yi)**2) for w,yn,yi in zip(weights,ynew,self.ydata)] # SSE
-
-    # The actual processor for automatic fitting
-    def automatic(self, z_range, ftype: str, stype: str, line_xydata):
-        self.z_range = z_range
-
-        if (ftype == "Solvent" and window.solventCA_customBeamwaist_checkBox.isChecked() is False):#\
-            #or (ftype == "Sample" and window.sampleCA_customBeamwaist_checkBox.isChecked() is False):
-            vary_beamwaist = False
-        else:
-            vary_beamwaist = True
-        
-        vary_centerpoint = True
-        if ftype == "Solvent" and stype == "OA":
-            if window.solventOA_customCenterPoint_checkBox.isChecked() is False:
-                vary_centerpoint = False
-            else:
-                vary_centerpoint = True
-        
-        # Apply initial values
-        self.params = Parameters()
-        self.params.add('Zero', value=self.zero_level, min=0.75, max=1.25)
-        self.params.add('Center', value=self.centerpoint, min=-50, max=50, vary=vary_centerpoint) # in number of datapoints
-        
-        if stype == "CA":
-            self.params.add('DPhi0', value=self.amplitude, min=-2, max=2)
-            self.params.add('Beamwaist', value=self.beamwaist, min=15E-6, max=150E-6, vary=vary_beamwaist)
-            self.params.add('Zrange', value=self.z_range, vary=False)
-        
-        elif stype == "OA":
-            self.params.add('T', value=self.amplitude, min=-2, max=2)
-            self.params.add('Beamwaist', value=self.beamwaist, vary=False)
-            self.params.add('Zrange', value=self.z_range, vary=False)
-        
-        if ftype == "Silica":
-            #line = window.silica_figure.axes.get_lines()[0]
-            #xs, ys = line.get_data()
-            xs, ys = line_xydata
-            weights = np.ones(np.shape(xs))
-            if hasattr(window, 'silica_cursorPositions'):
-                if len(window.silica_cursorPositions) == 2:
-                    # CA ranges for weighting the fit
-                    x1 = window.silica_cursorPositions[0][0]
-                    x1_index = list(xs).index(min(xs, key=lambda x:abs(x-x1)))
-                    # y1 = window.silica_cursorPositions[0][1]
-                    #y1_index = list(ys).index(min(ys, key=lambda x:abs(x-y1)))
-                    x2 = window.silica_cursorPositions[1][0]
-                    x2_index = list(xs).index(min(xs, key=lambda x:abs(x-x2)))
-                    # y2 = window.silica_cursorPositions[1][1]
-                    #y2_index = list(ys).index(min(ys, key=lambda x:abs(x-y2)))
-                    
-                    x_sm, x_lg = sorted([x1_index, x2_index])
-                    weights = [0 if (xi < x_sm or xi > x_lg) else 1 for xi in range(len(xs))]
-            
-            fitter = Minimizer(self.fcn2min,self.params,fcn_args=(weights))
-
-        elif ftype == "Solvent":
-            #line = window.solventCA_figure.axes.get_lines()[0]
-            #xs, ys = line.get_data()
-            xs, ys = line_xydata
-            weights = np.ones(np.shape(xs))
-            if stype == "CA":
-                attribute_name = 'solventCA_cursorPositions'
-            elif stype == "OA":
-                attribute_name = 'solventOA_cursorPositions'
-            
-            if hasattr(window, attribute_name):
-                if stype == "CA":
-                    attribute = window.solventCA_cursorPositions
-                elif stype == "OA":
-                    attribute = window.solventOA_cursorPositions
-
-                if len(attribute) == 2:
-                    # CA ranges for weighting the fit
-                    x1 = attribute[0][0]
-                    x1_index = list(xs).index(min(xs, key=lambda x:abs(x-x1)))
-                    # y1 = attribute[0][1]
-                    # y1_index = list(ys).index(min(ys, key=lambda x:abs(x-y1)))
-                    x2 = attribute[1][0]
-                    x2_index = list(xs).index(min(xs, key=lambda x:abs(x-x2)))
-                    # y2 = attribute[1][1]
-                    # y2_index = list(ys).index(min(ys, key=lambda x:abs(x-y2)))
-                    
-                    x_sm, x_lg = sorted([x1_index, x2_index])
-                    weights = [0 if (xi < x_sm or xi > x_lg) else 1 for xi in range(len(xs))]
-            
-            fitter = Minimizer(self.fcn2min,self.params,fcn_args=(weights))
-        
-        result = fitter.minimize(method='least_squares', max_nfev=1000)
-
-        res_pars = result.params.valuesdict().values()
-        result_line = self.manual(*res_pars, stype) # this will have to catch two lines (n2 and OA)
-
-        result.params.pretty_print()
-
-        return result, result_line
+# OTHER CLASSES
 
 class MotorPositioner(QObject):
     def movetostart(self, progress_callback):
@@ -2812,21 +2675,39 @@ class MotorPositioner(QObject):
         window.running = False
         
 if __name__ == '__main__':
-    import argparse
-    parser = argparse.ArgumentParser()
+    # ensure that every relative path down the script is referring to current directory of the script
+    # wherever it is being run and in whatever environment
+    if os.getcwd() != os.path.dirname(__file__):
+        os.chdir(os.path.dirname(__file__))
 
-    #-db DATABASE -u USERNAME -p PASSWORD -size 20000
-    parser.add_argument("-s",
-                        "--settings",
-                        dest = "settings_ini",
-                        default = f"{os.path.join(os.path.dirname(__file__), 'settings.ini')}",
-                        help="Path to settings file (with the filename.*ini)",
-                        type=str)
-    args = parser.parse_args()
-    
-    app = QtWidgets.QApplication(sys.argv)
-    window = Window(args.settings_ini)
-    app.setStyle("Fusion")
-    window.default_palette = QtGui.QGuiApplication.palette()
-    window.changeSkinDark() # Make sure the additional changes are applied
-    app.exec_()
+    last_path = load_settings()  # noqa: F405
+    if last_path is None:
+        print("Try getting write access to the directory or move the program folder to another one, in which you have write access.")
+    else:
+        parser = argparse.ArgumentParser()
+        #-db DATABASE -u USERNAME -p PASSWORD -size 20000
+        parser.add_argument("-s",
+                            "--settings",
+                            dest = "settings_ini",
+                            default = f"{last_path}",
+                            help="Path to settings file (with the filename.*ini)",
+                            type=str)
+        args = parser.parse_args()
+        
+        app = QtWidgets.QApplication(sys.argv)
+        # with cProfile.Profile() as pr:
+        window = Window(args.settings_ini)
+        app.setStyle("Fusion")
+        window.default_palette = QtGui.QGuiApplication.palette()
+        window.changeSkinDark() # Make sure the additional changes are applied
+        
+        # t_end = time.perf_counter()
+        # print(t_end - t_start)
+        # stats = pstats.Stats(pr)
+        # stats.sort_stats(pstats.SortKey.CUMULATIVE)
+        # # Output stats to a file
+        # with open('startup_stats.txt', 'w') as f:
+        #     stats.stream = f
+        #     stats.print_stats()
+        
+        app.exec_()

@@ -1,11 +1,13 @@
+import os
 from PyQt5.QtWidgets import QFileDialog
-from PyQt5.QtCore import QSettings,QFile
+from PyQt5.QtCore import QSettings,QFile,QFileInfo
 from os import chmod, access, W_OK
-from os.path import abspath, dirname, join, pardir
+from os.path import join
 
 __all__ = [
     'DEFAULT_SETTINGS_LINES',
     'apply_settings',
+    'load_settings',
     'save_settings',
     'save_as',
     'sort_settings',
@@ -14,9 +16,6 @@ __all__ = [
     ]
 
 settings_lines = [
-                "[UI]",
-                "ui_path=./window.ui",
-                "defaults_location=./default_settings.ini",# expected location of default settings
                 "[MeasurementTab]",
                 "starting_position=35",
                 "ending_position=75",
@@ -34,17 +33,20 @@ settings_lines = [
                 "zrange=40",
                 "aperture_diameter=1",
                 "distance_from_focus_to_CA=260",
-                "solvents_path=./solvents.json",# expected location of solvents file
-                "previous_solvent=0",# index of solvent previously used
+                "solvents_path=./solvents.json",  # expected location of solvents file
+                "previous_solvent=0",  # index of solvent previously used
                 "[Hardware]",
                 "nidaqmx_device_name=/Dev1",
                 "nidaqmx_no_of_channels=3",
                 "nidaqmx_dig_edge_src=/Dev1/PFI0",
                 "thorlabs_motor_id=40180184",
-                "laser_repetition_rate=1000", # Hz
+                "laser_repetition_rate=1000",  # Hz
                 "[Perks]",
-                "end_beep_duration_ms=500", # ms
-                "end_beep_tone_frequency=800" # Hz
+                "end_beep_duration_ms=500",  # ms
+                "end_beep_tone_frequency=800",  # Hz
+                "[UI]",
+                "ui_path=./lib/window_gui.py",
+                "defaults_location=./default_settings.ini"  # expected location of default settings
                 ]
 DEFAULT_SETTINGS_LINES = '\n'.join(settings_lines)
             
@@ -72,6 +74,65 @@ def apply_settings(w, settings):
     
     # w.dataDirectory_lineEdit.setText(settings.value('FittingTab/solvents_path').replace("/","\\"))
 
+def load_settings(w=None,user=False):
+    temp_path = join(os.getcwd(),'settings.ini')
+    temp_settings = QSettings(temp_path, QSettings.IniFormat)
+    # this holds the value of last path of the settings file
+    
+    if w is None:  # for the purpose of running the program with previous settings file
+        # this part is supposed to be run ONLY before `Window` instance is created
+        # print("Making sure default settings file exists")
+        ensure_default_settings_file()
+        
+        # print("Checking temporary settings for last path...")
+        last_path = temp_settings.value('UI/last_settings_location')
+        if last_path is not None:
+            print(f"Last remembered path is: {last_path}")
+            info = QFileInfo(last_path)
+            if os.path.exists(last_path):
+                if bool(info.permissions() & QFile.WriteUser):
+                    # print("The file exists. Continuing to start the program.")
+                    return last_path
+                else:
+                    try:
+                        chmod(last_path, 0o777)
+                        return last_path
+                    except PermissionError:
+                        print(f"Cannot write to the file in: {last_path}. Reverting to {temp_path}")
+        
+        info = QFileInfo(temp_path)
+        if os.path.exists(temp_path):
+            if bool(info.permissions() & QFile.WriteUser):
+                print(f"No path found/File not found. Found file: {temp_path}.",
+                    "Continuing to start the program with the path of temporary settings file.",sep="\n")
+                temp_settings.setValue('UI/last_settings_location',temp_path)
+            else:
+                try:
+                    chmod(temp_path, 0o777)
+                except PermissionError:
+                    print(f"Cannot write to the file in: {temp_path}. Ensure you have write access to the program directory.")
+                    return
+        else:
+            # print(f"No path found/File not found. Creating defaults in: {temp_path}.")
+            write_settings_string(temp_path, DEFAULT_SETTINGS_LINES+f"\nlast_settings_location={temp_path}")
+        
+        # AT THIS POINT WHATEVER THE PROGRAM STARTED WITH, THERE IS AT LEAST THE DEFAULT SETTINGS IN THE (default_)settings.ini FILES.
+        # APART FROM NO WRITE ACCESS TO THE PROGRAM DIRECTORY. THIS HAS TO BE SOLVED BY THE USER - THE PROGRAM WON'T START.
+        return temp_path
+    
+    if user:  # for the purpose of loading the settings with user-selected file
+        # print("User selects the settings file")
+        path, _ = QFileDialog.getOpenFileName(w, "Load Settings", os.getcwd(), filter="INI file (*.ini)")
+        
+        if path:
+            # print(f"User selected the settings file: {path}")
+            temp_settings.setValue('UI/last_settings_location',path)
+            temp_settings.sync()
+            # print("Settings written to temp_settings.")
+            w.settings = QSettings(path, QSettings.IniFormat)
+            apply_settings(w,w.settings)
+            # print(f"New settings applied from file: {path}")
+
 def save_settings(w, settings):
     # Measurement Tab
     settings.setValue('MeasurementTab/starting_position',w.startPos_doubleSpinBox.value())
@@ -95,7 +156,7 @@ def save_settings(w, settings):
     settings.setValue('FittingTab/previous_solvent', w.solventName_comboBox.currentIndex())
     
 def save_as(w, settings):
-    path, _ = QFileDialog.getSaveFileName(w, "Save settings", join(abspath(dirname(__file__)),pardir), filter="INI file (*.ini)")
+    path, _ = QFileDialog.getSaveFileName(w, "Save settings", os.getcwd(), filter="INI file (*.ini)")
     
     save_settings(w,settings)
     result = sort_settings(settings)
@@ -136,16 +197,19 @@ def write_settings_string(path, s:str):
     with open(path, mode="w", encoding="utf-8") as f:
         f.write(s)
 
-def ensure_default_settings_file():
+def ensure_default_settings_file(default=True):
     '''Make sure default settings file exists and is not writeable by the user'''
-    if not QFile(join(dirname(__file__),pardir, "default_settings.ini")).exists():
-        # create default settings file
-        with open(join(dirname(__file__),pardir, "default_settings.ini"), mode="w", encoding="utf-8") as fi:
-            fi.write(DEFAULT_SETTINGS_LINES)
+    if default:
+        if not QFile("default_settings.ini").exists():
+            # create default settings file
+            print("Defaults don't exist. Creating default settings file.")
+            write_settings_string("default_settings.ini",DEFAULT_SETTINGS_LINES+"\nlast_settings_location=./default_settings.ini")
+            
+            temp_settings = QSettings("default_settings.ini", QSettings.IniFormat)
+            write_settings_string("default_settings.ini",sort_settings(temp_settings))
         
-        temp_settings = QSettings(join(dirname(__file__), pardir, "default_settings.ini"), QSettings.IniFormat)
-        write_settings_string(join(dirname(__file__), pardir, "default_settings.ini"),sort_settings(temp_settings))
-    
-    # prevent editing by setting permissions to read-only
-    if access(join(dirname(__file__), pardir, "default_settings.ini"), W_OK):
-        chmod(join(dirname(__file__), pardir, "default_settings.ini"), 0o444)
+        # prevent editing by setting permissions to read-only
+        if access("default_settings.ini", W_OK):
+            chmod("default_settings.ini", 0o444)
+        
+        print("Default setting file has been found or successfully created.")
