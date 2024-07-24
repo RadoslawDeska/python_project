@@ -8,37 +8,34 @@ M. G. Kuzyk and C. W. Dirk, Eds., page 655-692, Marcel Dekker, Inc., 1998
 """
 
 __author__ = "Radosław Deska"
-__version__ = '0.1.5'
+__version__ = '0.1.6'
 
-# CHANGES AFTER 0.1.4
+# CHANGES AFTER 0.1.5
 # 1) SCRIPT LOGICS:
-#      - fixed long time to load (moved import thorlabs_apt to lazily load only after INITIALIZE button click)
-#      - moved all Z-scan theory-related classes to external files
-#      - cleaned imports
-#      - settings logics cleanup
-# 2) SETTINGS:
-#      - added "load settings" functionality
-#      - added loading last settings by default
-# 3) SAMPLES:
-#      - added "load" and "save" samples to file functionality
-#          (now the user can not only rely on current session samples list
-#           but can add to the list the samples from a file and
-#           update the file with current list of samples)
-#          (this is more cross-session user-friendliness)
-# 4) GUI:
-#      - fixed long time to load (moved import thorlabs_apt to lazily load only after INITIALIZE button click)
-#      - added range selection selector radio buttons
-#      - fixed exit dialogbox ("No" now ignores the close event)
+#      - MotorPositioner().run() method now includes initial sleep time based on settings
+#           (I don't know if this should be like that, maybe another Hardware setting should be stored for this)
+#      - User interface (GUI) loading logics:
+#            i. try loading the compiled gui file based on loaded settings
+#           ii. try loading the non-compiled gui file based on loaded settings
+#          iii. try loading compiled default gui file
+#           iv. try loading non-compiled default gui file
+#            v. if all of the above fails, return False and inform the user
+# 2) GUI:
+#      - GUI elements don't overlap anymore
+#      - Sample code in Data saving tab is now based on QComboBox and stores sample concentration data in the very items
+#           (this is to provide the same user experience as for solvent QComboBox in Data fitting tab)
+#      - User now can completely modify the list of samples and solvents and their related properties and can save them
+#           in a JSON file
+#      - Scaling problems removed in Silica Fitting Tab (still problem of slight misalignments between OA and CA remains in Maximized Window)
+# 3) SOLVENTS:
+#      - Loading solvents with duplicated entries allows user to choose action (start afresh or keep new/old items)
+# 4) SAMPLES:
+#      - Loading samples with duplicated entries allows user to choose action (start afresh or keep new/old items)
 
-# import time
-# # t_start = time.perf_counter()
 import argparse
-# import cProfile
 import functools
-import json
 import logging
 import os
-# import pstats
 import re
 import sys
 import time
@@ -48,10 +45,13 @@ from datetime import datetime
 from typing import Tuple
 
 import matplotlib
+from matplotlib.offsetbox import AnchoredText
 import nidaqmx
 import numpy as np
+from lib.autocomplete import ComboBoxParametrization
 from lib.cursors import BlittedCursor
 from lib.figure import MplCanvas
+from lib.gui_modifiers import cover_widget
 from lib.mgmotor import MG17Motor
 from lib.settings import *  # noqa: F403
 from lib.theory import Fitting, Integration
@@ -68,7 +68,6 @@ from scipy.signal import medfilt
 from sigfig import round as error_rounding                                        
 
 matplotlib.rcParams.update({'font.size': 7})
-#from matplotlib.widgets import BlittedCursor
 
 # CONSTANTS
 SILICA_BETA = 0
@@ -80,7 +79,6 @@ MAX_DPHI0 = 3.142  # maximum DeltaPhi0 for silica (for sliders)
 SIG_FIG_MAN_FIT = 3  # number of significant digits in rounding values while manually fitting the curves
 
 # @Adam notes:
-# 0. stdlib Pathlib  a= Path("solent.json").read_text()
 # 1. Separation of UI frrom computations / domain logic
 #     Data representation (GUI / FE)   ---- API ---- Server logic / BE
 #         REST API (webdev)
@@ -102,7 +100,7 @@ def time_it(func):
         return result
     return wrapper
 
-class Window(QtWidgets.QMainWindow):
+class Window(QtWidgets.QMainWindow, ComboBoxParametrization):
 # INITIALIZATION
     def __init__(self, settings):
         super(Window, self).__init__()
@@ -111,12 +109,8 @@ class Window(QtWidgets.QMainWindow):
         if not self.load_GUI():
             return
         
-        self.solventOA_absorptionModel_label.setVisible(False)
-        self.solventOA_absorptionModel_comboBox.setVisible(False)
-        self.solventOA_fixROI_checkBox.setVisible(False)
-        
-        self.solventOA_saturationModel_label.setVisible(False)
-        self.solventOA_saturationModel_comboBox.setVisible(False)
+        self.toggle_absorption_model("Solvent")
+        self.toggle_saturation_model("Solvent")
         
         self.timing_and_threading()
         self.states()
@@ -126,34 +120,65 @@ class Window(QtWidgets.QMainWindow):
         self.slider_triggers()
         self.clicker_triggers()
         self.timer_triggers()
-        
         apply_settings(self,self.settings)  # noqa: F405
-        
         # SHOW THE APP WINDOW
         self.show()
 
     def load_GUI(self):
-        try:
-            from lib.window_gui import Ui_MainWindow
-            self.ui = Ui_MainWindow()
+        def compile(uif):
+            '''uif is the path to the file with the file name and extension *.ui'''
+            try:
+                with open(os.path.join('./lib/',Path(uif).stem+'_gui.py'),'w',encoding='utf-8') as pyf:
+                    uic.compileUi(uif,pyf)
+            except Exception:
+                print(f"Couldn't compile the UI file {uif}")
+                logging.error(traceback.format_exc())
+        
+        def get_namespace(ui_class):
+            self.ui = ui_class()
             self.ui.setupUi(self)
             
             # Set the attributes of the Window object to be the same as the Ui_MainWindow object
             for name in dir(self.ui):
                 if not name.startswith('__'):  # Ignore special methods
                     setattr(self, name, getattr(self.ui, name))
-            return True
-            
-        except ModuleNotFoundError:
+        
+        try:  # try loading the compiled gui file based on loaded settings
+            import importlib.util
+            from pathlib import Path
+            path = os.path.join('./lib/',Path(self.settings.value('UI/ui_path')).stem+'_gui.py')
             try:
+                spec = importlib.util.spec_from_file_location("Ui_MainWindow", path)
+            except Exception:
+                logging.error(traceback.format_exc())
+            window_gui = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(window_gui)
+        except Exception:
+            try:  # try loading the non-compiled gui file based on loaded settings
                 uic.loadUi(self.settings.value('UI/ui_path'), self)
             except FileNotFoundError:
-                try:
-                    uic.loadUi('window.ui', self)
-                except FileNotFoundError:
-                    self.showdialog("Error","Program files corrupted. GUI is missing file.")
-                    return False
-
+                try:  # try loading original compiled default gui
+                    from lib import window_gui
+                except (ModuleNotFoundError, ImportError):
+                    try:  # if the original gui file is missing try loading its non-compiled version
+                        uic.loadUi('window.ui', self)
+                    except FileNotFoundError:  # if all of the above fails, return False and inform the user
+                        logging.error(traceback.format_exc())
+                        self.showdialog("Error","Program files corrupted. GUI is missing file.")
+                        return False
+                    else:  # if the original non-compiled version is found, compile it
+                        compile('window.ui')
+                        return True
+                else:  # if loading compiled default gui is successful
+                    get_namespace(window_gui.Ui_MainWindow)
+                    return True
+            else:  # if non-compiled gui is found, compile the gui
+                compile(self.settings.value('UI/ui_path'))
+                return True
+        else:  # if loading compiled file based on settings is successful
+            get_namespace(window_gui.Ui_MainWindow)
+            return True
+        
     def timing_and_threading(self):
         self.timer=QTimer()
         self.threadpool = QThreadPool()
@@ -200,53 +225,7 @@ class Window(QtWidgets.QMainWindow):
         self.initialize_fitting_charts()
         
         # Solvents list
-        self.load_solvents()
-        # Others
-        
-    def load_solvents(self, caller=""):
-        """
-        The function takes care of solvents JSON file opening process and calls load_and_autocomplete method to actually populate
-        a combo box with data from file.
-
-        Args:
-            caller (str, optional): If caller is `LoadSolvents` the method asks the user to indicate the JSON file. Defaults to ""
-            which means the file stored in settings.
-        """
-        if caller == "":
-            try:
-                with open(self.settings.value('FittingTab/solvents_path'), mode="r", encoding="utf-8") as json_file:
-                    self.load_and_autocomplete(json_file)
-                
-            except FileNotFoundError:
-                self.showdialog('Warning','solvents.json not found in the default location. Select the file.')
-                path = os.path.abspath(os.path.dirname(__file__)) # this is where solvents.json is expected to be
-                file, _ = QFileDialog.getOpenFileName(self, "Open File", path,filter="JSON file (*.json)")
-                if file: # if dialog was not cancelled
-                    with open(file, mode="r", encoding="utf-8") as json_file:
-                        self.load_and_autocomplete(json_file)
-            
-        elif caller == "LoadSolvents":
-            path = os.path.join(self.settings.value('FittingTab/solvents_path'),os.pardir) # this is where solvents.json is expected to be
-            file, _ = QFileDialog.getOpenFileName(self, "Open File", path,filter="JSON file (*.json)")
-            if file: # if dialog was not cancelled
-                with open(file, mode="r", encoding="utf-8") as json_file:
-                    self.load_and_autocomplete(json_file)
-            else:
-                return
-
-    def load_and_autocomplete(self, json_file):
-        """
-        The function loads a JSON file containing solvents, populates a combo box with solvent names,
-        and enables autocomplete functionality.
-        
-        :param json_file: The `json_file` parameter in the `load_and_autocomplete` method is expected to
-        be a file object containing solvent data in JSON format. This method reads the JSON data from
-        the file, populates the `self.solvents` attribute with the data, adds the solvent names to the
-        solventName_comboBox combo box
-        """
-        self.solvents = json.load(json_file)
-        self.solventName_comboBox.addItems([key for key in sorted(self.solvents.keys())])
-        self.solvent_autocomplete()
+        self._select_JSON_file("Startup")
           
     def value_change_triggers(self):
             # Measurement Tab
@@ -258,10 +237,24 @@ class Window(QtWidgets.QMainWindow):
         self.extremes_radioButton.toggled.connect(self.range_selection)
         self.centerRange_radioButton.toggled.connect(self.range_selection)
             # Data saving Tab
-        self.codeOfSample_lineEdit.editingFinished.connect(lambda: self.sample_autocomplete("code"))
-        self.concentration_dataSavingTab_doubleSpinBox.editingFinished.connect(lambda: self.sample_autocomplete("conc"))
+        self.codeOfSample_comboBox.popupShow.connect(
+            lambda: self.codeOfSample_comboBox.setEditable(False)
+            if self.codeOfSample_comboBox.allItems()           # this if-else ensures that the combobox doesn't lock itself
+            else self.codeOfSample_comboBox.setEditable(True)  # in non-editable state when there is no item in the list
+        )
+        self.codeOfSample_comboBox.popupHide.connect(lambda: self.codeOfSample_comboBox.setEditable(True))
+        self.codeOfSample_comboBox.currentIndexChanged.connect(lambda: self._load_item(self.codeOfSample_comboBox))
+        self.concentration_dataSavingTab_doubleSpinBox.editingFinished.connect(lambda: self._populate_combo_with_params(self.codeOfSample_comboBox))
             # Data fitting Tab
-        self.solventName_comboBox.currentIndexChanged.connect(self.solvent_autocomplete)
+        self.solventName_comboBox.popupShow.connect(
+            lambda: self.solventName_comboBox.setEditable(False)
+            if self.solventName_comboBox.allItems()           # this if-else ensures that the combobox doesn't lock itself
+            else self.solventName_comboBox.setEditable(True)  # in non-editable state when there is no item in the list
+        )
+        self.solventName_comboBox.popupHide.connect(lambda: self.solventName_comboBox.setEditable(True))
+        self.solventName_comboBox.currentIndexChanged.connect(lambda: self._load_item(self.solventName_comboBox))
+        self.solventDensity_doubleSpinBox.editingFinished.connect(lambda: self._populate_combo_with_params(self.solventName_comboBox))
+        self.solventRefrIdx_doubleSpinBox.editingFinished.connect(lambda: self._populate_combo_with_params(self.solventName_comboBox))
         self.zscanRange_doubleSpinBox.editingFinished.connect(self.set_new_positions)
     
     def slider_triggers(self):
@@ -292,10 +285,13 @@ class Window(QtWidgets.QMainWindow):
     def clicker_triggers(self):
         # Menu triggers
         # File
-        self.actionLoadSamples.triggered.connect(lambda: self.sample_autocomplete("file_open"))
-        self.actionSaveSamples.triggered.connect(lambda: self.sample_autocomplete("file_save"))
-        self.actionLoadSolvents.triggered.connect(lambda: self.load_solvents(caller="LoadSolvents"))
         self.actionExit.triggered.connect(self.close)
+        # Samples
+        self.actionLoadSamples.triggered.connect(lambda: self._select_JSON_file("actionLoadSamples"))
+        self.actionSaveSamples.triggered.connect(lambda: self._save_JSON_file("actionSaveSamples"))
+        # Solvents
+        self.actionLoadSolvents.triggered.connect(lambda: self._select_JSON_file("actionLoadSolvents"))
+        self.actionSaveSolvents.triggered.connect(lambda: self._save_JSON_file("actionSaveSolvents"))
         # Settings
         self.actionLoadSettings.triggered.connect(lambda: load_settings(self,user=True))  # noqa: F405
         self.actionSaveSettings.triggered.connect(lambda: save_settings(self,self.settings))  # noqa: F405
@@ -394,9 +390,12 @@ class Window(QtWidgets.QMainWindow):
         self.abs_chart.axes.set_ylabel('Amplitude (V)')
         layout_abs = self.absolute_layout
         layout_abs.addWidget(self.abs_chart)
-
-        self.rms_text = self.abs_chart.axes.text(0.87,0.9, f"RMS noise = {self.rms_value*100:.3f}%", transform=self.abs_chart.axes.transAxes,
-                                                 bbox = dict(boxstyle='round', facecolor='white', alpha=1))
+        
+        self.rms_text = AnchoredText(f"RMS noise = {self.rms_value*100:.3f}%",
+                  prop=dict(size=8),frameon=True, loc='upper right')
+        
+        self.rms_text.patch.set_boxstyle("round,pad=0.,rounding_size=0.2")
+        self.abs_chart.axes.add_artist(self.rms_text)
         
         self.charts = {"relative": self.rel_chart, "absolute": self.abs_chart}
         # initialize empty lines and data dictionaries
@@ -643,7 +642,7 @@ class Window(QtWidgets.QMainWindow):
         self.data["positions"] = []     # reset positions to empty list
         
         self.rms_value = 0.0
-        self.rms_text.set_text(f"RMS noise = {self.rms_value*100:.3f}%")
+        self.rms_text.txt.set_text(f"RMS noise = {self.rms_value*100:.3f}%")
 
         for type, chart in self.charts.items():     # e.g.: take the tuple ("relative", "self.rel_chart")
             for chan_no in range(self.number_of_channels_used):
@@ -806,7 +805,7 @@ class Window(QtWidgets.QMainWindow):
         # full log header
         header = ("Z-scan Measurement\n"                                                                             # line 0
                   #f"Sample type: {self.cuvetteType_comboBox.currentText()}\n"                                           
-                  f"Code: {self.codeOfSample_lineEdit.text()}\n"                                                     # line 1
+                  f"Code: {self.codeOfSample_comboBox.currentText()}\n"                                              # line 1
                   f"Silica thickness: {self.silicaThickness_dataSavingTab_doubleSpinBox.text()}\n"                   # line 2
                   f"Concentration: {self.concentration_dataSavingTab_doubleSpinBox.text()}\n"                        # line 3
                   f"Wavelength: {self.wavelength_dataSavingTab_doubleSpinBox.text()}\n"                              # line 4
@@ -819,7 +818,7 @@ class Window(QtWidgets.QMainWindow):
                   "CH3:   Open aperture\n"                                                                           # line 11
                   "CH4:   Empty channel\n\n"                                                                         # line 12
                   "--------------------------------------------------------------------------------------------\n\n" # line 13
-                  "SNo.  [V] Voltage Max        [V] Voltage Max        [V] Voltage Max        [V] Voltage Max\n\n"   # line 14
+                  "SNo.   CA channel [V]        Ref channel [V]         OA channel [V]        Empty channel [V]\n\n" # line 14
                   "--------------------------------------------------------------------------------------------\n")  # line 15
 
         raw_log = self.rawLogData_textBrowser.toPlainText()
@@ -842,7 +841,7 @@ class Window(QtWidgets.QMainWindow):
         now = datetime.now()
         self.cur_date = now.strftime("%Y_%m_%d")
         self.cur_time = now.strftime("%H_%M")
-        sample_type = self.codeOfSample_lineEdit.text()
+        sample_type = self.codeOfSample_comboBox.currentText()
         
         concentration = self.concentration_dataSavingTab_doubleSpinBox.value()
         conc_hyphen = str(f"{concentration:.2f}").replace(".","-")
@@ -859,11 +858,15 @@ class Window(QtWidgets.QMainWindow):
     
     def data_save(self):
         self.accurate_path = os.path.join(self.mainDirectory_lineEdit.text(),self.cur_date)
+        print(self.accurate_path)
+        try:
+            os.makedirs(self.accurate_path)  # creates all folders that do not exist on the way to the last folder
+        except FileExistsError:
+            print(f"Directory already exists at: {self.accurate_path}")
+        except Exception:
+            logging.error(traceback.format_exc())
         
         try:
-            if not os.path.exists(self.accurate_path):
-                os.mkdir(self.accurate_path)
-            
             for file in self.files:
                 with open(os.path.join(self.accurate_path,file), 'w') as f:
                     if self.files.index(file) == 0:
@@ -877,6 +880,8 @@ class Window(QtWidgets.QMainWindow):
         
         except PermissionError:
             self.showdialog('Error', 'Permission denied!\nCannot write the file in this directory.')
+        except FileNotFoundError:
+            self.showdialog('')
 
 # DATA FITTING
     def data_loader(self, caller: str, ftype: str):
@@ -2226,71 +2231,150 @@ class Window(QtWidgets.QMainWindow):
                         self.concentr_percent = float(concentration_match.groups()[0].replace(' ','')[:-1]) # remove redundant space and % symbol and change to float
                         self.concentration_dataFittingTab_doubleSpinBox.setValue(self.concentr_percent)
 
-    def solvent_autocomplete(self):
-        self.solventDensity_lineEdit.setText(str(self.solvents[self.solventName_comboBox.currentText()]["density"])+' g/cm3')
-        self.solventRefrIdx_lineEdit.setText(str(self.solvents[self.solventName_comboBox.currentText()]["index"]))
-
-    def sample_autocomplete(self, who_called: str):
-        """Remembers the input data of (sample code, concentration) pairs
-        and brings the remembered value of concentration for each remembered
-        sample code.
+    # def qbox_completer(self, what_to_do: str, target_box: QtWidgets.QComboBox, who=None):
+    #     """Remembers the input data of (sample code, concentration) pairs
+    #     and brings the remembered value of concentration for each remembered
+    #     sample code.
         
-        Underlying methods allow for deleting remembered values by navigaing
-        the dropdown and clicking Delete key.
+    #     Underlying methods allow for deleting remembered values by navigaing
+    #     the dropdown and clicking Delete key.
 
-        Args:
-            who_called (str): Discriminator of what should be remembered or brought
-            to the user.
+    #     Args:
+    #         `what_to_do` (str): Discriminator of what should be remembered or brought
+    #         to the user.
+    #             :: 'change_sample' means that the original sample code will be remembered and already
+    #             existing one will display the value of concentration that was saved with the sample code
+    #             :: 'update_sample_params' means that the previous value of concentration will be replaced with the 
+    #             current one, or (if the current code sample is empty string) the case is skipped 
+    #             and no action is taken.
             
-                'code' means that the original sample code will be remembered and already
-            existing one will display the value of concentration that was saved with the sample code
-            
-                'conc' means that the previous value of concentration will be replaced with the 
-            current one, or (if the current code sample is empty string) the case is skipped 
-            and no action is taken.
-        """
-        samp_code = self.codeOfSample_lineEdit.text()
-        conc_val = self.concentration_dataSavingTab_doubleSpinBox.value()
-        compl = self.codeOfSample_lineEdit.completer
+    #         `target_box` (QComboBox QtWidget)
+    #         `who` (str): which combobox is the target (for file open/save cases). Defaults to None for
+    #             all cases where this value is not required.
+    #     """
+    #     def get_data(which):
+    #         match which:
+    #             case "sample":
+    #                 name = self.codeOfSample_comboBox.currentText()
+    #                 concentration = self.concentration_dataSavingTab_doubleSpinBox.value()
+    #                 data = (name, {"concentration": concentration})
+    #             case "solvent":
+    #                 name = self.solventName_comboBox.currentText()
+    #                 density = self.solventDensity_doubleSpinBox.value()
+    #                 rind = self.solventRefrIdx_doubleSpinBox.value()
+    #                 data = (name, {"density": density, "index": rind})
+    #         return data
         
-        match who_called:
-            case "code":
-                if samp_code not in compl.dict_data:
-                    compl.add(samp_code, conc_val)
-                else:
-                    self.concentration_dataSavingTab_doubleSpinBox.setValue(compl.dict_data[samp_code])
-            case "conc":
-                if samp_code in compl.dict_data:
-                    compl.add(samp_code, conc_val)
-                else:
-                    return
+    #     if not isinstance(target_box, QtWidgets.QComboBox):
+    #         return
+    #     qbox = target_box
+    #     cb_index = qbox.currentIndex()
+    #     if qbox.itemData(cb_index):
+    #         qitem_data = qbox.itemData(cb_index)[1]  # this is actual data dict associated with the code/name
+    #     else:  # runs when new item is added to qbox by user-typing in
+    #         match what_to_do:
+    #             case "change_solvent":
+    #                 qbox.setItemData(cb_index, get_data("solvent"))
+    #                 qitem_data = qbox.itemData(cb_index)[1]
+    #             case "change_sample":
+    #                 qbox.setItemData(cb_index, get_data("sample"))
+    #                 qitem_data = qbox.itemData(cb_index)[1]
+    #             case _:
+    #                 pass       
+        
+    #     match what_to_do:
+    #         case "change_sample":
+    #             if qbox.count() != 0:
+    #                 # so if there are any items in the combobox
+    #                 # (THIS IS ALWAYS TRUE! THIS RUNS ONLY AFTER ITEM WAS ADDED)
+    #                 self.concentration_dataSavingTab_doubleSpinBox.setValue(qitem_data["concentration"])
+    #             else:
+    #                 pass
             
-            case "file_open":
-                cwd = os.path.join(os.path.abspath(os.path.dirname(__file__)))
-                reply = QMessageBox.question(self,"Warning",
-                                     "Duplicated values will be replaced. Do you wish to continue?",
-                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
-                if reply == QMessageBox.Yes:
-                    path, _ = QFileDialog.getOpenFileName(self, "Load Samples", cwd, filter="JSON file (*.json)")
+    #         case "update_sample_params":  # update sample concentration
+    #             if qbox.count() != 0:
+    #                 qbox.setItemData(cb_index, get_data("sample"))
+    #             else:  # there is no item the concentration value should be assigned to
+    #                 return
+            
+    #         case "change_solvent":  # runs when an item is selected or a new one added
+    #             if qbox.count() != 0:
+    #                 # so if there are any items in the combobox
+    #                 # (generally solvents should load automatically on startup)
+    #                 self.solventDensity_doubleSpinBox.setValue(qitem_data["density"])
+    #                 self.solventRefrIdx_doubleSpinBox.setValue(qitem_data["index"])
+    #             else:  
+    #                 # if user doesn't choose another solvent.json file to fill in the combobox
+    #                 # the list will be empty. It can be filled by the user.
+    #                 pass
+            
+    #         case "update_solvent_params":  # update solvent density/solvent refractive index
+    #             if qbox.count() != 0:
+    #                 qbox.setItemData(cb_index, get_data("solvent"))
+    #             else:  # there is no item the concentration value should be assigned to
+    #                 print('here')
+    #                 return
+            
+    #         case "file_open":
+    #             if not who:
+    #                 print("The `who` parameter not specified")
+    #                 return
+    #             cwd = os.path.join(os.path.abspath(os.path.dirname(__file__)))
+    #             if qbox.count() != 0:
+    #                 reply = QMessageBox.question(self,"Warning",
+    #                                     "Duplicated values will be replaced. Do you wish to continue?",
+    #                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+    #             else:
+    #                 reply = QMessageBox.Yes
                 
-                    if path:
-                        with open(path) as f:
-                            try:
-                                file_content = json.load(f,parse_float=float)
-                            except json.decoder.JSONDecodeError:
-                                return
+    #             if reply == QMessageBox.Yes:
+    #                 path, _ = QFileDialog.getOpenFileName(self, "Load file", cwd, filter="JSON file (*.json)")
+                
+    #                 if path:
+    #                     ####### THIS IN FACT DOUBLES THE load_solvent METHOD
+    #                     with open(path) as f:
+    #                         try:
+    #                             file_content = json.load(f,parse_float=float)
+    #                         except json.decoder.JSONDecodeError:
+    #                             return
+                        
+    #                     qbox.currentIndexChanged.disconnect()  # because there is no need to change values
+    #                                                             # of concentration spinbox while adding items
+    #                                                             # this also should save some time
+    #                     for key, value in file_content.items():
+    #                         if not isinstance(value, int|float):
+    #                             continue
                             
-                            for key, value in file_content.items():
-                                compl.add(key,value)
+    #                         if key not in qbox.allItems():
+    #                             qbox.addItem(key, value)
+    #                         else:  # here is where duplicates get replaced
+    #                             key_index = qbox.findText(key)
+    #                             qbox.setItemData(key_index, value)
+                        
+    #                     qbox.currentIndexChanged.connect(lambda: self.qbox_completer("code"))  # reconnect the indexChange signal
+                        
+    #                     if all([not isinstance(value, int|float) for value in file_content.values()]):
+    #                         self.showdialog("Info", "Nothing has been loaded. Choose proper file.")
+    #                         return
+    #                     elif any([not isinstance(value, int|float) for value in file_content.values()]):
+    #                         self.showdialog("Info", "Some items haven't been loaded. Check if your file content is correct.")
+                        
+    #                     qbox.setCurrentIndex(0)  # the code above doesn't change the index after all so setting it to 0 doesn't emit signal
+    #                     # if target_box == 
+    #                     # self.qbox_completer(what_to_do, target_box)  # this is why the function is explictly called here.
             
-            case "file_save":
-                cwd = os.path.join(os.path.abspath(os.path.dirname(__file__)))
-                path, _ = QFileDialog.getSaveFileName(self, "Save Samples", cwd, filter="JSON file (*.json)")
+    #         case "file_save":
+    #             cwd = os.path.join(os.path.abspath(os.path.dirname(__file__)))
+    #             path, _ = QFileDialog.getSaveFileName(self, "Save file", cwd, filter="JSON file (*.json)")
                 
-                if path:
-                    with open(path, 'w', encoding='utf-8') as output_file:
-                        non_empty_dict = {k: v for k, v in compl.dict_data.items() if k != ''}
-                        json.dump(non_empty_dict, output_file, indent=4)
+    #             if path:
+    #                 with open(path, 'w', encoding='utf-8') as output_file:
+    #                     dic = {}
+    #                     for i in range(qbox.count()):
+    #                         code = qbox.itemText(i)
+    #                         conc = qbox.itemData(i)
+    #                         dic[code] = conc
+    #                     json.dump(dic, output_file, indent=4)
             
 # THREAD CONTROLS
     def print_output(self, returned_value):
@@ -2317,9 +2401,9 @@ class Window(QtWidgets.QMainWindow):
         return worker
 
 # DIALOG BOXES
-    def showdialog(self, msg_type: str, message: str, kwargs={}):
+    def showdialog(self, msg_type: str, message: str, **kwargs):
         '''
-        Message type (msg_type) is one of these: 'Error', 'Warning', 'Info'
+        Message type (msg_type) is one of these: 'Error', 'Warning', 'Info', 'Combobox'
         '''
         dialog_args = (msg_type, message)
         match msg_type:
@@ -2331,7 +2415,47 @@ class Window(QtWidgets.QMainWindow):
                 button = QMessageBox.information(self, *dialog_args)
             case "Question":
                 button = QMessageBox.question(self, *dialog_args)
-        
+            case "Combobox":  # used for loading solvent/sample list from file
+                box = QMessageBox()
+                box.setIcon(QMessageBox.Question)
+                box.setWindowTitle('Combobox items loading')
+                box.setText(message)
+                
+                button_options = {
+                    'fresh': ('Start fresh list', QMessageBox.YesRole),
+                    'new_dup': ('Keep new duplicates', QMessageBox.YesRole),
+                    'old_dup': ('Keep older duplicates', QMessageBox.YesRole),
+                    'append': ('Append to old list', QMessageBox.YesRole),
+                }
+                
+                buttons_added = {}
+                if 'buttons' in kwargs:
+                    for button in kwargs['buttons']:
+                        buttons_added[button] = box.addButton(*button_options[button])
+                    for button in button_options:
+                        if button not in kwargs["buttons"]:  # all buttons that were not passed to the method
+                            buttons_added[button] = None
+                            
+                buttons_added['cancel'] = box.addButton('Don\'t load anything', QMessageBox.RejectRole)
+                box.setDefaultButton(buttons_added['cancel'])
+                
+                box.exec_()
+                response = box.clickedButton()
+                
+                match response:
+                    case response if response is buttons_added['fresh']:
+                        return (True,False)
+                    case response if response is buttons_added['new_dup']:
+                        return (False,True)
+                    case response if response is buttons_added['append']:
+                        return (False,True)
+                    case response if response is buttons_added['old_dup']:
+                        return (False,False)
+                    case response if response is buttons_added['cancel']:
+                        return None
+                    case _:
+                        return None
+                
         if button == QMessageBox.Yes:
             return button
 
@@ -2396,8 +2520,9 @@ class Window(QtWidgets.QMainWindow):
             ))
         
         # Measurement Tab Charts
-        self.rms_text.set_color("white")
-        self.rms_text.set_bbox(dict(boxstyle='round', facecolor=(60/255,60/255,65/255), edgecolor=(200/255,200/255,200/255), alpha=1))
+        self.rms_text.txt.get_children()[0].set_color("white")
+        self.rms_text.patch.set_facecolor((60/255,60/255,65/255))
+        self.rms_text.patch.set_edgecolor((200/255,200/255,200/255,1))
 
         for chart in self.charts.values():
             chart.fig.patch.set_facecolor((35/255,35/255,40/255,1))
@@ -2484,9 +2609,10 @@ class Window(QtWidgets.QMainWindow):
             ))
         
         # Measurement Tab Charts
-        self.rms_text.set_color("black")
-        self.rms_text.set_bbox(dict(boxstyle='round', facecolor="white", edgecolor="black", alpha=1))
-
+        self.rms_text.txt.get_children()[0].set_color("black")
+        self.rms_text.patch.set_facecolor("white")
+        self.rms_text.patch.set_edgecolor("black")
+        
         for chart in self.charts.values():
             chart.fig.patch.set_facecolor((255/255,255/255,255/255,1))
             chart.axes.set_facecolor((255/255,255/255,255/255,1))
@@ -2533,7 +2659,6 @@ class Window(QtWidgets.QMainWindow):
         self.setStyleSheet(stylesheet)
             
 # OTHER CLASSES
-
 class MotorPositioner(QObject):
     def movetostart(self, progress_callback):
         start_pos = window.startPos_doubleSpinBox.value()
@@ -2590,10 +2715,13 @@ class MotorPositioner(QObject):
         return "Homing performed!"
 
     def run(self, progress_callback):
+        '''This function collects all the data from measurement. The function runs in a separate thread so that
+        freezes of GUI such as dialog boxes doesn't affect the measurement process.'''
         window.data_acquisition_complete = False
         window.data_reversed = False # when backwards scan is performed, it later gets reversed (the data_reverse() method)
 
-        time.sleep(0.2) # Sometimes the first datapoint is collected before the motor has settled
+        slp_time = float(window.settings.value("MeasurementTab/samples_per_position"))/float(window.settings.value("Hardware/laser_repetition_rate"))
+        time.sleep(slp_time) # Sometimes the first datapoint is collected before the motor has settled
 
         nos = window.stepsScan_spinBox.value()
 
@@ -2650,7 +2778,7 @@ class MotorPositioner(QObject):
 
                 y = window.data["absolute"][1]
                 window.rms_value = np.abs(np.sqrt(np.mean([yi**2 for yi in y])) - y[0])/y[0]
-                window.rms_text.set_text(f"RMS noise = {window.rms_value*100:.3f}%")
+                window.rms_text.txt.set_text(f"RMS noise = {window.rms_value*100:.3f}%")
                 
                 window.measurement_plot_rescale(window.focusAt_comboBox.currentText())
 
@@ -2685,7 +2813,6 @@ if __name__ == '__main__':
         print("Try getting write access to the directory or move the program folder to another one, in which you have write access.")
     else:
         parser = argparse.ArgumentParser()
-        #-db DATABASE -u USERNAME -p PASSWORD -size 20000
         parser.add_argument("-s",
                             "--settings",
                             dest = "settings_ini",
@@ -2695,19 +2822,16 @@ if __name__ == '__main__':
         args = parser.parse_args()
         
         app = QtWidgets.QApplication(sys.argv)
-        # with cProfile.Profile() as pr:
         window = Window(args.settings_ini)
         app.setStyle("Fusion")
         window.default_palette = QtGui.QGuiApplication.palette()
         window.changeSkinDark() # Make sure the additional changes are applied
         
-        # t_end = time.perf_counter()
-        # print(t_end - t_start)
-        # stats = pstats.Stats(pr)
-        # stats.sort_stats(pstats.SortKey.CUMULATIVE)
-        # # Output stats to a file
-        # with open('startup_stats.txt', 'w') as f:
-        #     stats.stream = f
-        #     stats.print_stats()
+        cover_widget(window.silicaCA_fittingsummary_3)
+        cover_widget(window.labels_frame_2)
+        cover_widget(window.gridLayout_48)
+        cover_widget(window.frame_3)
+        cover_widget(window.silica_fit_pushButton_2)
+        cover_widget(window.bottom_layout_4)
         
         app.exec_()

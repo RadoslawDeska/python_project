@@ -70,8 +70,7 @@ def apply_settings(w, settings):
     w.zscanRange_doubleSpinBox.setValue(float(settings.value('FittingTab/zrange')))
     w.apertureDiameter_doubleSpinBox.setValue(float(settings.value('FittingTab/aperture_diameter')))
     w.apertureToFocusDistance_doubleSpinBox.setValue(float(settings.value('FittingTab/distance_from_focus_to_CA')))
-    w.solventName_comboBox.setCurrentIndex(int(settings.value('FittingTab/previous_solvent')))
-    
+    w.solventName_comboBox.setCurrentIndex(min(0, int(settings.value('FittingTab/previous_solvent'))))  # Fallbacks to 0 if value from settings is invalid
     # w.dataDirectory_lineEdit.setText(settings.value('FittingTab/solvents_path').replace("/","\\"))
 
 def load_settings(w=None,user=False):
@@ -142,7 +141,7 @@ def save_settings(w, settings):
 
     # Data saving Tab
     settings.setValue('SavingTab/silica_thickness', w.silicaThickness_dataSavingTab_doubleSpinBox.value())
-    settings.setValue('SavingTab/concentration', w.concentration_dataSavingTab_doubleSpinBox.value())
+    # settings.setValue('SavingTab/concentration', w.concentration_dataSavingTab_doubleSpinBox.value())
     settings.setValue('SavingTab/wavelength', w.wavelength_dataSavingTab_doubleSpinBox.value())
     settings.setValue('SavingTab/main_directory', w.mainDirectory_lineEdit.text())
 
