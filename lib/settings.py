@@ -45,7 +45,7 @@ settings_lines = [
                 "end_beep_duration_ms=500",  # ms
                 "end_beep_tone_frequency=800",  # Hz
                 "[UI]",
-                "ui_path=./lib/window_gui.py",
+                "ui_path=./window.ui",
                 "defaults_location=./default_settings.ini"  # expected location of default settings
                 ]
 DEFAULT_SETTINGS_LINES = '\n'.join(settings_lines)

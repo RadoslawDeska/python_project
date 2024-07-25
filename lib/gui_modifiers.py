@@ -1,5 +1,4 @@
-from PyQt5.QtCore import QObject
-from PyQt5.QtWidgets import QLayout, QWidget, QSlider
+from PyQt5.QtWidgets import QLayout, QWidget
 
 def cover_widget(widget):
     if isinstance(widget, QLayout):
@@ -16,6 +15,3 @@ def cover_widget(widget):
         wsizepolicy.setRetainSizeWhenHidden(True)
         widget.setSizePolicy(wsizepolicy)
         widget.hide()
-
-def rms_text_resize_handle(parent):
-    pass

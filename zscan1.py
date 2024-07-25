@@ -8,29 +8,12 @@ M. G. Kuzyk and C. W. Dirk, Eds., page 655-692, Marcel Dekker, Inc., 1998
 """
 
 __author__ = "Radosław Deska"
-__version__ = '0.1.6'
+__version__ = '0.1.7'
 
-# CHANGES AFTER 0.1.5
+# CHANGES AFTER 0.1.6
 # 1) SCRIPT LOGICS:
-#      - MotorPositioner().run() method now includes initial sleep time based on settings
-#           (I don't know if this should be like that, maybe another Hardware setting should be stored for this)
-#      - User interface (GUI) loading logics:
-#            i. try loading the compiled gui file based on loaded settings
-#           ii. try loading the non-compiled gui file based on loaded settings
-#          iii. try loading compiled default gui file
-#           iv. try loading non-compiled default gui file
-#            v. if all of the above fails, return False and inform the user
-# 2) GUI:
-#      - GUI elements don't overlap anymore
-#      - Sample code in Data saving tab is now based on QComboBox and stores sample concentration data in the very items
-#           (this is to provide the same user experience as for solvent QComboBox in Data fitting tab)
-#      - User now can completely modify the list of samples and solvents and their related properties and can save them
-#           in a JSON file
-#      - Scaling problems removed in Silica Fitting Tab (still problem of slight misalignments between OA and CA remains in Maximized Window)
-# 3) SOLVENTS:
-#      - Loading solvents with duplicated entries allows user to choose action (start afresh or keep new/old items)
-# 4) SAMPLES:
-#      - Loading samples with duplicated entries allows user to choose action (start afresh or keep new/old items)
+#      - Problem of not finding UI file is solved (occured on startup occasionally).
+#      - Some cleaning in the files.
 
 import argparse
 import functools
@@ -602,7 +585,7 @@ class Window(QtWidgets.QMainWindow, ComboBoxParametrization):
         # save settings so that if there is any crash afterwards, the settings are preserved
         save_settings(self, self.settings)  # noqa: F405
         self.running = True
-        self.thread_it(self.mpositioner.movetostart)
+        self.thread_it(self.mpositioner.movetostart)            
 
 # GUI EVENTS TIMING
     def start_timer(self):
