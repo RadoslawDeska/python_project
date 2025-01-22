@@ -19,8 +19,9 @@ settings_lines = [
                 "[MeasurementTab]",
                 "starting_position=35",
                 "ending_position=75",
-                "step_per_cycle=200",
+                "steps_per_scan=200",
                 "samples_per_position=200",
+                "number_of_scans=1",
                 "[SavingTab]",
                 "silica_thickness=4",
                 "concentration=0",
@@ -44,6 +45,7 @@ settings_lines = [
                 "[Perks]",
                 "end_beep_duration_ms=500",  # ms
                 "end_beep_tone_frequency=800",  # Hz
+                "end_beep_emit=True",  # whether the beep should be emitted or not
                 "[UI]",
                 "ui_path=./window.ui",
                 "defaults_location=./default_settings.ini"  # expected location of default settings
@@ -54,8 +56,9 @@ def apply_settings(w, settings):
     # Measurement Tab
     w.startPos_doubleSpinBox.setValue(float(settings.value('MeasurementTab/starting_position')))
     w.endPos_doubleSpinBox.setValue(float(settings.value('MeasurementTab/ending_position')))
-    w.stepsScan_spinBox.setValue(int(settings.value('MeasurementTab/step_per_cycle')))
+    w.stepsScan_spinBox.setValue(int(settings.value('MeasurementTab/steps_per_scan')))
     w.samplesStep_spinBox.setValue(int(settings.value('MeasurementTab/samples_per_position')))
+    w.numberOfScans_spinBox.setValue(int(settings.value('MeasurementTab/number_of_scans')))
     
     # Data saving Tab
     w.silicaThickness_dataSavingTab_doubleSpinBox.setValue(float(settings.value('SavingTab/silica_thickness')))
@@ -136,8 +139,9 @@ def save_settings(w, settings):
     # Measurement Tab
     settings.setValue('MeasurementTab/starting_position',w.startPos_doubleSpinBox.value())
     settings.setValue('MeasurementTab/ending_position', w.endPos_doubleSpinBox.value())
-    settings.setValue('MeasurementTab/step_per_cycle', w.stepsScan_spinBox.value())
+    settings.setValue('MeasurementTab/steps_per_scan', w.stepsScan_spinBox.value())
     settings.setValue('MeasurementTab/samples_per_position', w.samplesStep_spinBox.value())
+    settings.setValue('MeasurementTab/number_of_scans', w.numberOfScans_spinBox.value())
 
     # Data saving Tab
     settings.setValue('SavingTab/silica_thickness', w.silicaThickness_dataSavingTab_doubleSpinBox.value())

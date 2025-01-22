@@ -1,9 +1,7 @@
-from PyQt5.QtGui import *
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
+from PyQt5.QtCore import QObject, pyqtSignal, QRunnable, pyqtSlot
 
-import time
-import traceback, sys
+import traceback
+import sys
 
 '''
 https://www.pythonguis.com/tutorials/multithreading-pyqt-applications-qthreadpool/
@@ -26,13 +24,20 @@ class WorkerSignals(QObject):
 
     progress
         int indicating % progress
+        
+    data_ready
+        (int, int, object, str, bool) represents data (object)
+        when ready and additional info about signal occurence
 
     '''
     finished = pyqtSignal()
     error = pyqtSignal(tuple)
     result = pyqtSignal(object)
     progress = pyqtSignal(int)
-    #status = pyqtSignal(str)
+    job_starting = pyqtSignal()
+    data_ready = pyqtSignal(int, int, object)
+    acquisition_complete = pyqtSignal(bool, int)
+    motion_finished = pyqtSignal(bool)
 
 
 class Worker(QRunnable):
@@ -51,7 +56,7 @@ class Worker(QRunnable):
 
     def __init__(self, fn, *args, **kwargs):
         super(Worker, self).__init__()
-
+        
         # Store constructor arguments (re-used for processing)
         self.fn = fn
         self.args = args
@@ -60,7 +65,9 @@ class Worker(QRunnable):
 
         # Add the callback to our kwargs
         self.kwargs['progress_callback'] = self.signals.progress
-        #self.kwargs['status_callback'] = self.signals.status
+        self.kwargs['data_ready_callback'] = self.signals.data_ready
+        self.kwargs['acquisition_complete'] = self.signals.acquisition_complete
+        self.kwargs['motion_finished_callback'] = self.signals.motion_finished
 
     @pyqtSlot()
     def run(self):
@@ -70,8 +77,9 @@ class Worker(QRunnable):
 
         # Retrieve args/kwargs here; and fire processing using them
         try:
+            self.signals.job_starting.emit()
             result = self.fn(*self.args, **self.kwargs)
-        except:
+        except Exception:
             traceback.print_exc()
             exctype, value = sys.exc_info()[:2]
             self.signals.error.emit((exctype, value, traceback.format_exc()))
@@ -79,3 +87,7 @@ class Worker(QRunnable):
             self.signals.result.emit(result)  # Return the result of the processing
         finally:
             self.signals.finished.emit()  # Done
+    
+    def resume(self):
+        if 'mpositioner' in self.kwargs:
+            self.kwargs['mpositioner'].resumed = True

@@ -1,10 +1,10 @@
 from cycler import cycler
 import matplotlib
 matplotlib.use('Qt5Agg')
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT as NavigationToolbar
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from matplotlib.ticker import FormatStrFormatter
-matplotlib.rcParams['axes.prop_cycle'] = cycler(color=['orange','#3c7ffc','magenta'])
+matplotlib.rcParams['axes.prop_cycle'] = cycler(color=['orange','#0090ff','magenta'])
 
 class MplCanvas(FigureCanvasQTAgg):
 
@@ -19,5 +19,6 @@ class MplCanvas(FigureCanvasQTAgg):
             self.axes.grid(b=True, which='both', axis='both')
         else:
             self.axes.grid(visible=True, which='both', axis='both')
+        self.axes.grid(zorder=0)
         self.axes.yaxis.set_major_formatter(FormatStrFormatter('%.3f'))
         super(MplCanvas, self).__init__(self.fig)
