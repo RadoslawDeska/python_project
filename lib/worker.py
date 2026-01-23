@@ -1,9 +1,7 @@
-from PyQt5.QtGui import *
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
+from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot, QRunnable
 
-import time
-import traceback, sys
+# import time
+# import traceback, sys
 
 '''
 https://www.pythonguis.com/tutorials/multithreading-pyqt-applications-qthreadpool/
