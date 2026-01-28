@@ -1229,7 +1229,7 @@ border:None;</string>
          <x>10</x>
          <y>19</y>
          <width>321</width>
-         <height>191</height>
+         <height>195</height>
         </rect>
        </property>
        <layout class="QFormLayout" name="formLayout">
@@ -2305,8 +2305,8 @@ border:None;</string>
              <rect>
               <x>180</x>
               <y>10</y>
-              <width>177</width>
-              <height>44</height>
+              <width>187</width>
+              <height>46</height>
              </rect>
             </property>
             <layout class="QVBoxLayout" name="verticalLayout_8">
@@ -2334,7 +2334,7 @@ border:None;</string>
              <rect>
               <x>10</x>
               <y>11</y>
-              <width>164</width>
+              <width>171</width>
               <height>68</height>
              </rect>
             </property>
@@ -2433,7 +2433,7 @@ border:None;</string>
           <enum>QTabWidget::North</enum>
          </property>
          <property name="currentIndex">
-          <number>0</number>
+          <number>1</number>
          </property>
          <widget class="QWidget" name="tab_2">
           <attribute name="title">
@@ -3124,7 +3124,7 @@ border:None;</string>
              <rect>
               <x>10</x>
               <y>10</y>
-              <width>164</width>
+              <width>171</width>
               <height>68</height>
              </rect>
             </property>
@@ -3187,8 +3187,8 @@ border:None;</string>
              <rect>
               <x>180</x>
               <y>10</y>
-              <width>177</width>
-              <height>44</height>
+              <width>187</width>
+              <height>46</height>
              </rect>
             </property>
             <layout class="QVBoxLayout" name="verticalLayout_15">
@@ -4046,8 +4046,8 @@ border:None;</string>
             <rect>
              <x>470</x>
              <y>330</y>
-             <width>111</width>
-             <height>24</height>
+             <width>114</width>
+             <height>27</height>
             </rect>
            </property>
            <layout class="QHBoxLayout" name="horizontalLayout_8">
@@ -4114,8 +4114,8 @@ border:None;</string>
             <rect>
              <x>20</x>
              <y>450</y>
-             <width>611</width>
-             <height>141</height>
+             <width>608</width>
+             <height>148</height>
             </rect>
            </property>
            <property name="frameShape">
@@ -4124,205 +4124,201 @@ border:None;</string>
            <property name="frameShadow">
             <enum>QFrame::Raised</enum>
            </property>
-           <widget class="QWidget" name="layoutWidget_4">
-            <property name="geometry">
-             <rect>
-              <x>10</x>
-              <y>10</y>
-              <width>164</width>
-              <height>68</height>
-             </rect>
-            </property>
-            <layout class="QVBoxLayout" name="verticalLayout_13">
-             <item>
-              <widget class="QLabel" name="label_117">
-               <property name="text">
-                <string>Additional data manipulation</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QLabel" name="label_73">
-               <property name="font">
-                <font>
-                 <weight>75</weight>
-                 <bold>true</bold>
-                </font>
-               </property>
-               <property name="text">
-                <string>REDUCE NOISE</string>
-               </property>
-               <property name="alignment">
-                <set>Qt::AlignCenter</set>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QSlider" name="solventOA_filterSize_slider">
-               <property name="enabled">
-                <bool>false</bool>
-               </property>
-               <property name="minimum">
-                <number>0</number>
-               </property>
-               <property name="maximum">
-                <number>15</number>
-               </property>
-               <property name="singleStep">
-                <number>1</number>
-               </property>
-               <property name="pageStep">
-                <number>1</number>
-               </property>
-               <property name="value">
-                <number>0</number>
-               </property>
-               <property name="sliderPosition">
-                <number>0</number>
-               </property>
-               <property name="orientation">
-                <enum>Qt::Horizontal</enum>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </widget>
-           <widget class="QWidget" name="layoutWidget">
-            <property name="geometry">
-             <rect>
-              <x>180</x>
-              <y>10</y>
-              <width>177</width>
-              <height>44</height>
-             </rect>
-            </property>
-            <layout class="QVBoxLayout" name="verticalLayout_11">
-             <item>
-              <widget class="QLabel" name="label_122">
-               <property name="text">
-                <string>Additional fitting manipulations</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QCheckBox" name="solventOA_isAbsorption_checkBox">
-               <property name="enabled">
-                <bool>false</bool>
-               </property>
-               <property name="toolTip">
-                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Normally a solvent shouldn't absorb non-linearly.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-               </property>
-               <property name="text">
-                <string>Assume no absorption</string>
-               </property>
-               <property name="checked">
-                <bool>true</bool>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </widget>
-           <widget class="QWidget" name="layoutWidget">
-            <property name="geometry">
-             <rect>
-              <x>180</x>
-              <y>60</y>
-              <width>151</width>
-              <height>72</height>
-             </rect>
-            </property>
-            <layout class="QVBoxLayout" name="verticalLayout_12">
-             <item>
-              <widget class="QLabel" name="solventOA_absorptionModel_label">
-               <property name="text">
-                <string>Absorption model</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QComboBox" name="solventOA_absorptionModel_comboBox">
-               <item>
+           <layout class="QGridLayout" name="gridLayout_11">
+            <item row="0" column="0" rowspan="2">
+             <layout class="QVBoxLayout" name="verticalLayout_13">
+              <item>
+               <widget class="QLabel" name="label_117">
                 <property name="text">
-                 <string>2PA</string>
+                 <string>Additional data manipulation</string>
                 </property>
-               </item>
-               <item>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="label_73">
+                <property name="font">
+                 <font>
+                  <weight>75</weight>
+                  <bold>true</bold>
+                 </font>
+                </property>
                 <property name="text">
-                 <string>SA</string>
+                 <string>REDUCE NOISE</string>
                 </property>
-               </item>
-               <item>
+                <property name="alignment">
+                 <set>Qt::AlignCenter</set>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QSlider" name="solventOA_filterSize_slider">
+                <property name="enabled">
+                 <bool>false</bool>
+                </property>
+                <property name="minimum">
+                 <number>0</number>
+                </property>
+                <property name="maximum">
+                 <number>15</number>
+                </property>
+                <property name="singleStep">
+                 <number>1</number>
+                </property>
+                <property name="pageStep">
+                 <number>1</number>
+                </property>
+                <property name="value">
+                 <number>0</number>
+                </property>
+                <property name="sliderPosition">
+                 <number>0</number>
+                </property>
+                <property name="orientation">
+                 <enum>Qt::Horizontal</enum>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <spacer name="verticalSpacer_5">
+                <property name="orientation">
+                 <enum>Qt::Vertical</enum>
+                </property>
+                <property name="sizeHint" stdset="0">
+                 <size>
+                  <width>20</width>
+                  <height>40</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+             </layout>
+            </item>
+            <item row="0" column="1" colspan="2">
+             <layout class="QVBoxLayout" name="verticalLayout_11">
+              <item>
+               <widget class="QLabel" name="label_122">
                 <property name="text">
-                 <string>3PA</string>
+                 <string>Additional fitting manipulations</string>
                 </property>
-               </item>
-               <item>
+               </widget>
+              </item>
+              <item>
+               <widget class="QCheckBox" name="solventOA_isAbsorption_checkBox">
+                <property name="enabled">
+                 <bool>false</bool>
+                </property>
+                <property name="toolTip">
+                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Normally a solvent shouldn't absorb non-linearly.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
                 <property name="text">
-                 <string>RSA</string>
+                 <string>Assume no absorption</string>
                 </property>
-               </item>
-               <item>
+                <property name="checked">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item row="1" column="1">
+             <layout class="QVBoxLayout" name="verticalLayout_12">
+              <item>
+               <widget class="QLabel" name="solventOA_absorptionModel_label">
                 <property name="text">
-                 <string>2PA+SA</string>
+                 <string>Absorption model</string>
                 </property>
-               </item>
-               <item>
+               </widget>
+              </item>
+              <item>
+               <widget class="QComboBox" name="solventOA_absorptionModel_comboBox">
+                <item>
+                 <property name="text">
+                  <string>2PA</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>SA</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>3PA</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>RSA</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>2PA+SA</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>2PA+3PA</string>
+                 </property>
+                </item>
+               </widget>
+              </item>
+              <item>
+               <widget class="QCheckBox" name="solventOA_fixROI_checkBox">
+                <property name="toolTip">
+                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;To perform fit in region of interest only, check this box&lt;br/&gt;and select the region in the plot using cursor applying the boundaries by mouse clicks.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
                 <property name="text">
-                 <string>2PA+3PA</string>
+                 <string>Fix region of interest</string>
                 </property>
-               </item>
-              </widget>
-             </item>
-             <item>
-              <widget class="QCheckBox" name="solventOA_fixROI_checkBox">
-               <property name="toolTip">
-                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;To perform fit in region of interest only, check this box&lt;br/&gt;and select the region in the plot using cursor applying the boundaries by mouse clicks.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-               </property>
-               <property name="text">
-                <string>Fix region of interest</string>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </widget>
-           <widget class="QWidget" name="layoutWidget_6">
-            <property name="geometry">
-             <rect>
-              <x>360</x>
-              <y>60</y>
-              <width>258</width>
-              <height>46</height>
-             </rect>
-            </property>
-            <layout class="QVBoxLayout" name="verticalLayout_16">
-             <item>
-              <widget class="QLabel" name="solventOA_saturationModel_label">
-               <property name="text">
-                <string>Saturation model</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QComboBox" name="solventOA_saturationModel_comboBox">
-               <item>
+               </widget>
+              </item>
+              <item>
+               <spacer name="verticalSpacer_6">
+                <property name="orientation">
+                 <enum>Qt::Vertical</enum>
+                </property>
+                <property name="sizeHint" stdset="0">
+                 <size>
+                  <width>20</width>
+                  <height>40</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+             </layout>
+            </item>
+            <item row="1" column="2">
+             <layout class="QVBoxLayout" name="verticalLayout_16">
+              <item>
+               <widget class="QLabel" name="solventOA_saturationModel_label">
                 <property name="text">
-                 <string>α=αₒ/(1+I/Isat) - from rate equation</string>
+                 <string>Saturation model</string>
                 </property>
-               </item>
-               <item>
-                <property name="text">
-                 <string>α=αₒ/√(1+I/Isat) - spectral hole burning</string>
-                </property>
-               </item>
-               <item>
-                <property name="text">
-                 <string>α=αₒ/[1+√(I/Isat)] - Samoc's formula</string>
-                </property>
-               </item>
-              </widget>
-             </item>
-            </layout>
-           </widget>
+               </widget>
+              </item>
+              <item>
+               <widget class="QComboBox" name="solventOA_saturationModel_comboBox">
+                <item>
+                 <property name="text">
+                  <string>α=αₒ/(1+I/Isat) - from rate equation</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>α=αₒ/√(1+I/Isat) - spectral hole burning</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>α=αₒ/[1+√(I/Isat)] - Samoc's formula</string>
+                 </property>
+                </item>
+               </widget>
+              </item>
+             </layout>
+            </item>
+           </layout>
           </widget>
          </widget>
         </widget>
@@ -4335,11 +4331,11 @@ border:None;</string>
            <height>631</height>
           </rect>
          </property>
-         <property name="autoFillBackground">
-          <bool>true</bool>
-         </property>
          <property name="visible">
           <bool>false</bool>
+         </property>
+         <property name="autoFillBackground">
+          <bool>true</bool>
          </property>
          <property name="text">
           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;&lt;span style=&quot; font-size:12pt; font-weight:600; color:#ff0000;&quot;&gt;INACTIVE&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
@@ -4363,7 +4359,7 @@ border:None;</string>
           <enum>QTabWidget::North</enum>
          </property>
          <property name="currentIndex">
-          <number>0</number>
+          <number>1</number>
          </property>
          <widget class="QWidget" name="tab_8">
           <attribute name="title">
@@ -4408,7 +4404,7 @@ border:None;</string>
             <string>Fit CA!</string>
            </property>
           </widget>
-          <widget class="QSlider" name="sampleCA_deltaTpv_slider">
+          <widget class="QSlider" name="sampleCA_DPhi0_slider">
            <property name="enabled">
             <bool>false</bool>
            </property>
@@ -4494,7 +4490,7 @@ border:None;</string>
                </font>
               </property>
               <property name="text">
-               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;ΔT&lt;span style=&quot; vertical-align:sub;&quot;&gt;pv&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;ΔΦ&lt;span style=&quot; vertical-align:sub;&quot;&gt;0&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
               </property>
               <property name="textFormat">
                <enum>Qt::RichText</enum>
@@ -5054,7 +5050,7 @@ border:None;</string>
              <rect>
               <x>10</x>
               <y>10</y>
-              <width>164</width>
+              <width>171</width>
               <height>68</height>
              </rect>
             </property>
@@ -5117,8 +5113,8 @@ border:None;</string>
              <rect>
               <x>180</x>
               <y>10</y>
-              <width>177</width>
-              <height>44</height>
+              <width>187</width>
+              <height>46</height>
              </rect>
             </property>
             <layout class="QVBoxLayout" name="verticalLayout_18">
@@ -5166,7 +5162,7 @@ border:None;</string>
              </widget>
             </item>
             <item row="1" column="1">
-             <widget class="QSlider" name="sampleCA_beamwaist_slider">
+             <widget class="QSlider" name="sampleCA_RayleighLength_slider">
               <property name="enabled">
                <bool>false</bool>
               </property>
@@ -5196,7 +5192,7 @@ border:None;</string>
                </font>
               </property>
               <property name="text">
-               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;right&quot;&gt;ΔZ&lt;span style=&quot; vertical-align:sub;&quot;&gt;pv&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;right&quot;&gt;Z&lt;span style=&quot; vertical-align:sub;&quot;&gt;Rayleigh&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
               </property>
              </widget>
             </item>
@@ -5976,8 +5972,8 @@ border:None;</string>
             <rect>
              <x>470</x>
              <y>330</y>
-             <width>111</width>
-             <height>24</height>
+             <width>114</width>
+             <height>27</height>
             </rect>
            </property>
            <layout class="QHBoxLayout" name="horizontalLayout_9">
@@ -6045,8 +6041,14 @@ border:None;</string>
              <x>20</x>
              <y>450</y>
              <width>611</width>
-             <height>141</height>
+             <height>148</height>
             </rect>
+           </property>
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
            </property>
            <property name="frameShape">
             <enum>QFrame::StyledPanel</enum>
@@ -6054,205 +6056,225 @@ border:None;</string>
            <property name="frameShadow">
             <enum>QFrame::Raised</enum>
            </property>
-           <widget class="QWidget" name="layoutWidget_11">
-            <property name="geometry">
-             <rect>
-              <x>10</x>
-              <y>10</y>
-              <width>164</width>
-              <height>68</height>
-             </rect>
-            </property>
-            <layout class="QVBoxLayout" name="verticalLayout_19">
-             <item>
-              <widget class="QLabel" name="label_156">
-               <property name="text">
-                <string>Additional data manipulation</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QLabel" name="label_77">
-               <property name="font">
-                <font>
-                 <weight>75</weight>
-                 <bold>true</bold>
-                </font>
-               </property>
-               <property name="text">
-                <string>REDUCE NOISE</string>
-               </property>
-               <property name="alignment">
-                <set>Qt::AlignCenter</set>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QSlider" name="sampleOA_filterSize_slider">
-               <property name="enabled">
-                <bool>false</bool>
-               </property>
-               <property name="minimum">
-                <number>0</number>
-               </property>
-               <property name="maximum">
-                <number>15</number>
-               </property>
-               <property name="singleStep">
-                <number>1</number>
-               </property>
-               <property name="pageStep">
-                <number>1</number>
-               </property>
-               <property name="value">
-                <number>0</number>
-               </property>
-               <property name="sliderPosition">
-                <number>0</number>
-               </property>
-               <property name="orientation">
-                <enum>Qt::Horizontal</enum>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </widget>
-           <widget class="QWidget" name="layoutWidget_12">
-            <property name="geometry">
-             <rect>
-              <x>180</x>
-              <y>10</y>
-              <width>177</width>
-              <height>44</height>
-             </rect>
-            </property>
-            <layout class="QVBoxLayout" name="verticalLayout_20">
-             <item>
-              <widget class="QLabel" name="label_157">
-               <property name="text">
-                <string>Additional fitting manipulations</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QCheckBox" name="sampleOA_isAbsorption_checkBox">
-               <property name="enabled">
-                <bool>false</bool>
-               </property>
-               <property name="toolTip">
-                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Normally a solvent shouldn't absorb non-linearly.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-               </property>
-               <property name="text">
-                <string>Assume no absorption</string>
-               </property>
-               <property name="checked">
-                <bool>true</bool>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </widget>
-           <widget class="QWidget" name="layoutWidget_13">
-            <property name="geometry">
-             <rect>
-              <x>180</x>
-              <y>60</y>
-              <width>151</width>
-              <height>72</height>
-             </rect>
-            </property>
-            <layout class="QVBoxLayout" name="verticalLayout_21">
-             <item>
-              <widget class="QLabel" name="sampleOA_absorptionModel_label">
-               <property name="text">
-                <string>Absorption model</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QComboBox" name="sampleOA_absorptionModel_comboBox">
-               <item>
+           <layout class="QGridLayout" name="gridLayout_9">
+            <item row="0" column="1" colspan="2">
+             <layout class="QVBoxLayout" name="verticalLayout_20">
+              <item>
+               <widget class="QLabel" name="label_157">
                 <property name="text">
-                 <string>2PA</string>
+                 <string>Additional fitting manipulations</string>
                 </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item row="1" column="1">
+             <layout class="QVBoxLayout" name="verticalLayout_21">
+              <item>
+               <widget class="QCheckBox" name="sampleOA_fixROI_checkBox">
+                <property name="toolTip">
+                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;To perform fit in region of interest only, check this box&lt;br/&gt;and select the region in the plot using cursor applying the boundaries by mouse clicks.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
+                <property name="text">
+                 <string>Fix region of interest</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="sampleOA_absorptionModel_label">
+                <property name="text">
+                 <string>Absorption model</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QComboBox" name="sampleOA_absorptionModel_comboBox">
+                <item>
+                 <property name="text">
+                  <string>2PA</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>SA</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>3PA</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>RSA</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>2PA+SA</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>2PA+3PA</string>
+                 </property>
+                </item>
+               </widget>
+              </item>
+              <item>
+               <spacer name="verticalSpacer_3">
+                <property name="orientation">
+                 <enum>Qt::Vertical</enum>
+                </property>
+                <property name="sizeHint" stdset="0">
+                 <size>
+                  <width>20</width>
+                  <height>40</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+             </layout>
+            </item>
+            <item row="1" column="2">
+             <layout class="QVBoxLayout" name="verticalLayout_22">
+              <item>
+               <spacer name="verticalSpacer_2">
+                <property name="orientation">
+                 <enum>Qt::Vertical</enum>
+                </property>
+                <property name="sizeType">
+                 <enum>QSizePolicy::Expanding</enum>
+                </property>
+                <property name="sizeHint" stdset="0">
+                 <size>
+                  <width>0</width>
+                  <height>0</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+              <item>
+               <widget class="QLabel" name="sampleOA_saturationModel_label">
+                <property name="text">
+                 <string>Saturation model</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QComboBox" name="sampleOA_saturationModel_comboBox">
+                <item>
+                 <property name="text">
+                  <string>α=αₒ/(1+I/Isat) - from rate equation</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>α=αₒ/√(1+I/Isat) - spectral hole burning</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>α=αₒ/[1+√(I/Isat)] - Samoc's formula</string>
+                 </property>
+                </item>
+               </widget>
+              </item>
+              <item>
+               <spacer name="verticalSpacer_4">
+                <property name="orientation">
+                 <enum>Qt::Vertical</enum>
+                </property>
+                <property name="sizeType">
+                 <enum>QSizePolicy::Fixed</enum>
+                </property>
+                <property name="sizeHint" stdset="0">
+                 <size>
+                  <width>20</width>
+                  <height>32</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+             </layout>
+            </item>
+            <item row="0" column="0" rowspan="2">
+             <widget class="QFrame" name="frame_11">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <layout class="QVBoxLayout" name="verticalLayout_19">
+               <item>
+                <widget class="QLabel" name="label_156">
+                 <property name="text">
+                  <string>Additional data manipulation</string>
+                 </property>
+                </widget>
                </item>
                <item>
-                <property name="text">
-                 <string>SA</string>
-                </property>
+                <widget class="QLabel" name="label_77">
+                 <property name="font">
+                  <font>
+                   <weight>75</weight>
+                   <bold>true</bold>
+                  </font>
+                 </property>
+                 <property name="text">
+                  <string>REDUCE NOISE</string>
+                 </property>
+                 <property name="alignment">
+                  <set>Qt::AlignCenter</set>
+                 </property>
+                </widget>
                </item>
                <item>
-                <property name="text">
-                 <string>3PA</string>
-                </property>
+                <widget class="QSlider" name="sampleOA_filterSize_slider">
+                 <property name="enabled">
+                  <bool>false</bool>
+                 </property>
+                 <property name="minimum">
+                  <number>0</number>
+                 </property>
+                 <property name="maximum">
+                  <number>15</number>
+                 </property>
+                 <property name="singleStep">
+                  <number>1</number>
+                 </property>
+                 <property name="pageStep">
+                  <number>1</number>
+                 </property>
+                 <property name="value">
+                  <number>0</number>
+                 </property>
+                 <property name="sliderPosition">
+                  <number>0</number>
+                 </property>
+                 <property name="orientation">
+                  <enum>Qt::Horizontal</enum>
+                 </property>
+                </widget>
                </item>
                <item>
-                <property name="text">
-                 <string>RSA</string>
-                </property>
+                <spacer name="verticalSpacer">
+                 <property name="orientation">
+                  <enum>Qt::Vertical</enum>
+                 </property>
+                 <property name="sizeHint" stdset="0">
+                  <size>
+                   <width>20</width>
+                   <height>40</height>
+                  </size>
+                 </property>
+                </spacer>
                </item>
-               <item>
-                <property name="text">
-                 <string>2PA+SA</string>
-                </property>
-               </item>
-               <item>
-                <property name="text">
-                 <string>2PA+3PA</string>
-                </property>
-               </item>
-              </widget>
-             </item>
-             <item>
-              <widget class="QCheckBox" name="sampleOA_fixROI_checkBox">
-               <property name="toolTip">
-                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;To perform fit in region of interest only, check this box&lt;br/&gt;and select the region in the plot using cursor applying the boundaries by mouse clicks.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-               </property>
-               <property name="text">
-                <string>Fix region of interest</string>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </widget>
-           <widget class="QWidget" name="layoutWidget_14">
-            <property name="geometry">
-             <rect>
-              <x>360</x>
-              <y>60</y>
-              <width>258</width>
-              <height>46</height>
-             </rect>
-            </property>
-            <layout class="QVBoxLayout" name="verticalLayout_22">
-             <item>
-              <widget class="QLabel" name="sampleOA_saturationModel_label">
-               <property name="text">
-                <string>Saturation model</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QComboBox" name="sampleOA_saturationModel_comboBox">
-               <item>
-                <property name="text">
-                 <string>α=αₒ/(1+I/Isat) - from rate equation</string>
-                </property>
-               </item>
-               <item>
-                <property name="text">
-                 <string>α=αₒ/√(1+I/Isat) - spectral hole burning</string>
-                </property>
-               </item>
-               <item>
-                <property name="text">
-                 <string>α=αₒ/[1+√(I/Isat)] - Samoc's formula</string>
-                </property>
-               </item>
-              </widget>
-             </item>
-            </layout>
-           </widget>
+              </layout>
+             </widget>
+            </item>
+           </layout>
           </widget>
          </widget>
         </widget>
@@ -6265,11 +6287,11 @@ border:None;</string>
            <height>631</height>
           </rect>
          </property>
-         <property name="autoFillBackground">
-          <bool>true</bool>
-         </property>
          <property name="visible">
           <bool>false</bool>
+         </property>
+         <property name="autoFillBackground">
+          <bool>true</bool>
          </property>
          <property name="text">
           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;&lt;span style=&quot; font-size:12pt; font-weight:600; color:#ff0000;&quot;&gt;INACTIVE&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
@@ -6875,11 +6897,11 @@ border:None;</string>
          <height>61</height>
         </rect>
        </property>
-       <property name="autoFillBackground">
-        <bool>true</bool>
-       </property>
        <property name="visible">
         <bool>false</bool>
+       </property>
+       <property name="autoFillBackground">
+        <bool>true</bool>
        </property>
        <property name="text">
         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;&lt;span style=&quot; font-size:12pt; font-weight:600; color:#ff0000;&quot;&gt;INACTIVE&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
