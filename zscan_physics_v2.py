@@ -253,18 +253,14 @@ class ClosedAperturePhysics:
             )
 
             # Generate fit
-            y_fit = fitter.manual(
-                zero_level=params.zero_level,
-                centerpoint=params.centerpoint,
-                amplitude=params.amplitude,
-                beamwaist=params.beamwaist,
+            fit_params, y_fit = fitter.automatic(
                 z_range=z_range,
                 d0=params.d0,
                 ra=params.ra,
                 stype="CA",
+                vary_beamwaist=True,
+                vary_centerpoint=True
             )
-
-            y_fit = np.asarray(y_fit, dtype=float)
 
             # Calculate metrics
             residuals = y_fit - ca_antisym
