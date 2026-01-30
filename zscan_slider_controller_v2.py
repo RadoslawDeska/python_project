@@ -29,8 +29,8 @@ class SliderConfig:
     slider_name: str  # UI widget name
     spinbox_name: Optional[str]  # Corresponding display spinbox
     param_name: str  # Parameter: amplitude, center, zero_level, etc
-    min_val: float
-    max_val: float
+    min_val: float  # Physical value in non-prefixed SI base unit
+    max_val: float  # Physical value in non-prefixed SI base unit
     step: float
     display_format: str  # Format string for display
 
@@ -49,15 +49,15 @@ class SliderController:
                 slider_name="silicaCA_zeroLevel_slider",
                 spinbox_name="silicaCA_zeroLevel_doubleSpinBox",
                 param_name="zero_level",
-                min_val=0.75,
-                max_val=1.25,
+                min_val=0.75,  # no units
+                max_val=1.25,  # no units
                 step=0.01,
                 display_format="{:.4f}",
             ),
             "amplitude": SliderConfig(
                 slider_name="silicaCA_DPhi0_slider",
                 spinbox_name="silicaCA_deltaPhi0Summary_doubleSpinBox",
-                param_name="DPhi0",
+                param_name="DPhi0",  # in radians
                 min_val=0.0,
                 max_val=2.0,
                 step=0.01,
@@ -66,16 +66,16 @@ class SliderController:
             "centerpoint": SliderConfig(
                 slider_name="silicaCA_centerPoint_slider",
                 spinbox_name=None,
-                param_name="centerpoint",
-                min_val=-50,
-                max_val=50,
-                step=1.0,
+                param_name="centerpoint",  # in meters
+                min_val=-0.01,
+                max_val=0.01,
+                step=0.001,
                 display_format="{:.1f}",
             ),
-            "rayleigh": SliderConfig(
-                slider_name="silicaCA_RayleighLength_slider",
-                spinbox_name="silicaCA_rayleighRangeSummary_doubleSpinBox",
-                param_name="z0",
+            "beamwaist": SliderConfig(
+                slider_name="silicaCA_Beamwaist_slider",
+                spinbox_name="silicaCA_beamwaistSummary_doubleSpinBox",
+                param_name="z0",  # in [mm]
                 min_val=0.0,
                 max_val=1.0,
                 step=0.1,
@@ -111,9 +111,9 @@ class SliderController:
                 step=1.0,
                 display_format="{:.1f}",
             ),
-            "rayleigh": SliderConfig(
-                slider_name="solventCA_RayleighLength_slider",
-                spinbox_name="solventCA_rayleighRangeSummary_doubleSpinBox",
+            "beamwaist": SliderConfig(
+                slider_name="solventCA_Beamwaist_slider",
+                spinbox_name="solventCA_beamwaistSummary_doubleSpinBox",
                 param_name="z0",
                 min_val=0.0,
                 max_val=1.0,
@@ -132,6 +132,15 @@ class SliderController:
                 step=0.01,
                 display_format="{:.4f}",
             ),
+            "amplitude": SliderConfig(
+                slider_name="sampleCA_DPhi0_slider",
+                spinbox_name="sampleCA_deltaPhi0Summary_doubleSpinBox",
+                param_name="DPhi0",
+                min_val=-2.0,
+                max_val=2.0,
+                step=0.01,
+                display_format="{:.4f}",
+            ),
             "centerpoint": SliderConfig(
                 slider_name="sampleCA_centerPoint_slider",
                 spinbox_name=None,
@@ -140,6 +149,15 @@ class SliderController:
                 max_val=50,
                 step=1.0,
                 display_format="{:.1f}",
+            ),
+            "beamwaist": SliderConfig(
+                slider_name="sampleCA_Beamwaist_slider",
+                spinbox_name="sampleCA_beamwaistSummary_doubleSpinBox",
+                param_name="z0",
+                min_val=0.0,
+                max_val=1.0,
+                step=0.1,
+                display_format="{:.2f}",
             ),
         },
         # SILICA OA
@@ -278,11 +296,15 @@ class SliderController:
             )
 
     @staticmethod
-    def slider_to_physical_with_range(config: SliderConfig, slider_value: int, 
-                                    slider_min: int, slider_max: int) -> float:
+    def slider_to_physical_with_range(
+        config: SliderConfig,
+        slider_value: int,
+        slider_min: int,
+        slider_max: int,
+    ) -> float:
         """
         Convert slider integer value to physical quantity
-        
+
         Args:
             config: SliderConfig with min/max physical values
             slider_value: Current slider value
@@ -291,19 +313,22 @@ class SliderController:
         """
         if slider_max == slider_min:
             return config.min_val
-        
+
         # Map slider range [slider_min, slider_max] to physical range [min_val, max_val]
         ratio = (slider_value - slider_min) / (slider_max - slider_min)
-        physical_value = config.min_val + ratio * (config.max_val - config.min_val)
-        
+        physical_value = config.min_val + ratio * (
+            config.max_val - config.min_val
+        )
+
         return physical_value
 
-
     @staticmethod
-    def slider_to_physical(config: SliderConfig, slider_value: int, slider_widget=None) -> float:
+    def slider_to_physical(
+        config: SliderConfig, slider_value: int, slider_widget=None
+    ) -> float:
         """
         Convert slider integer value to physical quantity
-        
+
         Args:
             config: SliderConfig with min/max physical values
             slider_value: Current slider value (0 to slider_max)
@@ -317,11 +342,15 @@ class SliderController:
             # Fallback: assume standard Qt range
             slider_min = 0
             slider_max = 100
-        
-        return SliderController.slider_to_physical_with_range(config, slider_value, slider_min, slider_max)
+
+        return SliderController.slider_to_physical_with_range(
+            config, slider_value, slider_min, slider_max
+        )
 
     @staticmethod
-    def physical_to_slider(config: SliderConfig, physical_value: float, slider_widget=None) -> int:
+    def physical_to_slider(
+        config: SliderConfig, physical_value: float, slider_widget=None
+    ) -> int:
         """Convert physical quantity back to slider value"""
         if slider_widget is not None:
             slider_min = slider_widget.minimum()
@@ -329,12 +358,14 @@ class SliderController:
         else:
             slider_min = 0
             slider_max = 100
-        
+
         # Map physical range to slider range
-        ratio = (physical_value - config.min_val) / (config.max_val - config.min_val)
+        ratio = (physical_value - config.min_val) / (
+            config.max_val - config.min_val
+        )
         ratio = np.clip(ratio, 0, 1)  # Clamp to valid range
         slider_value = int(slider_min + ratio * (slider_max - slider_min))
-        
+
         return slider_value
 
     def set_slider_value(
@@ -368,6 +399,41 @@ class SliderController:
                 spinbox.blockSignals(True)
                 spinbox.setValue(physical_value)
                 spinbox.blockSignals(False)
+
+    def set_slider_values(
+        self,
+        sample_type: SampleType,
+        aperture: ApertureType,
+        param_values: Dict[str, float],
+    ) -> None:
+        """
+        Update multiple sliders at once with a dictionary of param_name: physical_value pairs
+
+        Args:
+            sample_type: SampleType.SILICA, SOLVENT, or SAMPLE
+            aperture: ApertureType.CA or OA
+            param_values: Dict mapping param_name to physical_value
+                         e.g., {"amplitude": -0.5, "zero_level": 1.0, "centerpoint": 0.0}
+
+        Example:
+            self.slider_controller.set_slider_values(
+                sample_type=SampleType("solvent"),
+                aperture=ApertureType("CA"),
+                param_values={
+                    "amplitude": -0.482,
+                    "zero_level": 1.001,
+                    "centerpoint": 0.5,
+                    "beamwaist": 2.55,
+                }
+            )
+        """
+        for param_name, physical_value in param_values.items():
+            self.set_slider_value(
+                sample_type=sample_type,
+                aperture=aperture,
+                param_name=param_name,
+                physical_value=physical_value,
+            )
 
     def update_spinbox_display(
         self, spinbox_name: Optional[str], value: float, format_str: str

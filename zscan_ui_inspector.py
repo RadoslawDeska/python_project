@@ -103,8 +103,8 @@ def inspect_ui_xml(ui_path: str):
                 param = 'amplitude_dphi0'
             elif 'centerPoint' in name or 'center' in name.lower():
                 param = 'centerpoint'
-            elif 'Rayleigh' in name or 'rayleigh' in name.lower():
-                param = 'rayleigh'
+            elif 'Beamwaist' in name or 'Beamwaist' in name.lower():
+                param = 'beamwaist'
             elif 'filterSize' in name or 'filter' in name.lower():
                 param = 'filter_size'
             else:

@@ -11,34 +11,34 @@ Main Z-scan application with complete parameter management
 
 import sys
 from pathlib import Path
-from typing import Any, Optional, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
+
 import numpy as np
-
-from PyQt5.QtWidgets import QMainWindow, QApplication, QFileDialog, QMessageBox
-from PyQt5.QtCore import pyqtSignal, QObject, QThread
-from PyQt5.uic import loadUi
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from PyQt5.QtCore import QObject, QThread, pyqtSignal
+from PyQt5.QtWidgets import QApplication, QFileDialog, QMainWindow, QMessageBox
+from PyQt5.uic import loadUi
 
-from zscan_tab_manager_v2 import TabManager
-
+from zscan_config_manager_v2 import FittingConfig
 from zscan_data_parser_v2 import (
+    ProcessedZScanData,
     RawZScanData,
     ZScanFileParser,
     ZScanProcessor,
-    ProcessedZScanData,
 )
-from zscan_config_manager_v2 import FittingConfig
 from zscan_physics_v2 import (
     ClosedAperturePhysics,
-    OpenAperturePhysics,
     FittingResult,
+    OpenAperturePhysics,
 )
 from zscan_slider_controller_v2 import (
     ApertureType,
     SampleType,
+    SliderConfig,
     SliderController,
 )
+from zscan_tab_manager_v2 import TabManager
 
 
 class FitProgressEmitter(QObject):
@@ -110,7 +110,9 @@ class CanvasROISelector:
         # Try removing from axes containers
         try:
             if artist in self.ax.lines:
-                self.ax.lines[:] = [l for l in self.ax.lines if l is not artist]
+                self.ax.lines[:] = [
+                    line for line in self.ax.lines if line is not artist
+                ]
                 return
         except Exception:
             pass
@@ -243,6 +245,7 @@ class CanvasROISelector:
             )
 
             # Store limits (order doesn't matter
+            assert self.line1 is not None
             x_min = min(self.line1.get_xdata()[0], event.xdata)
             x_max = max(self.line1.get_xdata()[0], event.xdata)
             self.roi_limits = (x_min, x_max)
@@ -271,6 +274,38 @@ class CanvasROISelector:
 
 class UIParameterManager:
     """Manages reading and writing parameters from/to UI spinboxes"""
+
+    SLIDER_NAMES = {
+        "silica": [
+            "silicaCA_zeroLevel_slider",
+            "silicaCA_DPhi0_slider",
+            "silicaCA_centerPoint_slider",
+            "silicaCA_Beamwaist_slider",
+            "silicaCA_filterSize_slider",
+        ],
+        "solvent": [
+            "solventCA_zeroLevel_slider",
+            "solventCA_DPhi0_slider",
+            "solventCA_centerPoint_slider",
+            "solventCA_Beamwaist_slider",
+            "solventCA_filterSize_slider",
+            "solventOA_zeroLevel_slider",
+            "solventOA_T_slider",
+            "solventOA_centerPoint_slider",
+            "solventOA_filterSize_slider",
+        ],
+        "sample": [
+            "sampleCA_zeroLevel_slider",
+            "sampleCA_DPhi0_slider",
+            "sampleCA_centerPoint_slider",
+            "sampleCA_Beamwaist_slider",
+            "sampleCA_filterSize_slider",
+            "sampleOA_zeroLevel_slider",
+            "sampleOA_T_slider",
+            "sampleOA_centerPoint_slider",
+            "sampleOA_filterSize_slider",
+        ],
+    }
 
     def __init__(self, window):
         self.window = window
@@ -312,40 +347,10 @@ class UIParameterManager:
             widget.setReadOnly(not enable)  # Toggle user input
 
     def enable_sliders(self, sample_type: str, enable: bool):
-        """Enable/disable all sliders for a sample type"""
-        slider_names = {
-            "silica": [
-                "silicaCA_zeroLevel_slider",
-                "silicaCA_DPhi0_slider",
-                "silicaCA_centerPoint_slider",
-                "silicaCA_RayleighLength_slider",
-                "silicaCA_filterSize_slider",
-            ],
-            "solvent": [
-                "solventCA_zeroLevel_slider",
-                "solventCA_DPhi0_slider",
-                "solventCA_centerPoint_slider",
-                "solventCA_RayleighLength_slider",
-                "solventCA_filterSize_slider",
-                "solventOA_zeroLevel_slider",
-                "solventOA_T_slider",
-                "solventOA_centerPoint_slider",
-                "solventOA_filterSize_slider",
-            ],
-            "sample": [
-                "sampleCA_zeroLevel_slider",
-                "sampleCA_DPhi0_slider",
-                "sampleCA_centerPoint_slider",
-                "sampleCA_RayleighLength_slider",
-                "sampleCA_filterSize_slider",
-                "sampleOA_zeroLevel_slider",
-                "sampleOA_T_slider",
-                "sampleOA_centerPoint_slider",
-                "sampleOA_filterSize_slider",
-            ],
-        }
+        """Enable/disable all sliders for a given sample type"""
+        slider_list = UIParameterManager.SLIDER_NAMES.get(sample_type, [])
 
-        for slider_name in slider_names.get(sample_type, []):
+        for slider_name in slider_list:
             if hasattr(self.window, slider_name):
                 slider = getattr(self.window, slider_name)
                 slider.setEnabled(enable)
@@ -387,7 +392,6 @@ class ZScanMainWindow(QMainWindow):
         self.fit_thread: Optional[FittingThread] = None
 
         self.fitted_curves_original: dict[tuple[str, str], np.ndarray] = {}
-        self.fitted_curves_extended: dict[tuple[str, str], np.ndarray] = {}
 
         # Initialize slider controller
         self.slider_controller = SliderController(self)
@@ -823,173 +827,214 @@ class ZScanMainWindow(QMainWindow):
         self.statusbar.showMessage(f"✓ Loaded {raw.sample_code}")
 
     def on_slider_changed(
-        self, sample_type, aperture, param_name, physical_value, config
+        self,
+        sample_type,
+        aperture,
+        param_name,
+        physical_value,
+        config: SliderConfig,
     ):
-        """Callback when slider changes - modify curve exactly like minimal test"""
-        import numpy as np
-        
-        # Get data and fit
+        """
+        Handle slider value change - update fit curve in real-time
+
+        Directly mirrors the notebook workflow from testing.ipynb:
+        - Get current fit result
+        - Update ONE parameter value
+        - Call fit function with SAME data but UPDATED params
+        - Plot the result
+        """
+        sample_val = sample_type.value
+        aperture_val = aperture.value
+
+        print(f"\n{'=' * 70}")
+        print(f"SLIDER CHANGED: {param_name} → {physical_value}")
+        print(f"{'=' * 70}")
+
+        # ============================================================
+        # STEP 1: Get current fit result and data
+        # ============================================================
+        fit_result = self.fit_results.get((sample_val, aperture_val))
+        if fit_result is None:
+            print(f"✗ No fit result for {sample_val} {aperture_val}")
+            return
+
         data_map = {
             "silica": "silica_ca",
             "solvent": "solvent_ca",
             "sample": "sample_ca",
         }
-        data_key = data_map.get(sample_type.value)
-        data = self.data.get(data_key)
-        
+        data = self.data.get(data_map[sample_val])
         if data is None:
+            print(f"✗ No data for {sample_val}")
             return
-        
-        sample_val = sample_type.value
-        aperture_val = aperture.value
-        
-        fit_result = self.fit_results.get((sample_val, aperture_val))
-        if fit_result is None:
+
+        print("Current fit result:")
+        print(f"  amplitude: {fit_result.params.amplitude:.6f}")
+        print(f"  beamwaist: {fit_result.params.beamwaist * 1e6:.2f} µm")
+        print(f"  zero_level: {fit_result.params.zero_level:.4f}")
+        print(f"  centerpoint: {fit_result.params.centerpoint:.6f} m")
+
+        # ============================================================
+        # STEP 2: Update the parameter in fit_result.params
+        # ============================================================
+        if config.param_name == "zero_level":
+            fit_result.params.zero_level = physical_value
+        elif config.param_name == "DPhi0" or config.param_name == "T":
+            fit_result.params.amplitude = physical_value
+        elif config.param_name == "centerpoint":
+            fit_result.params.centerpoint = physical_value
+        elif config.param_name == "beamwaist":
+            fit_result.params.beamwaist = physical_value
+        else:
+            print(f"✗ Unknown parameter: {config.param_name}")
             return
-        
-        # Update spinbox display
+
+        print(f"\nUpdated {config.param_name} to {physical_value}")
+        print("New fit_result.params:")
+        print(f"  amplitude: {fit_result.params.amplitude:.6f}")
+        print(f"  beamwaist: {fit_result.params.beamwaist * 1e6:.2f} µm")
+        print(f"  zero_level: {fit_result.params.zero_level:.4f}")
+        print(f"  centerpoint: {fit_result.params.centerpoint:.6f} m")
+
+        # ============================================================
+        # STEP 3: Call fit function with SAME data, UPDATED params
+        # ============================================================
+        print("\nRecalculating fit with new parameter...")
+        print(f"  Calling fit_{aperture_val}(")
+        print(
+            f"    data={len(data.ca_antisym if aperture_val == 'CA' else data.oa)} points"
+        )
+        print(
+            f"    positions={data.position_centered[0]:.3f} to {data.position_centered[-1]:.3f} mm"
+        )
+        print(f"    wavelength={data.wavelength_nm} nm")
+        print("    params=(updated)")
+        print("  )")
+
+        try:
+            if aperture_val == "CA":
+                result_new = ClosedAperturePhysics.fit_ca_manual(
+                    ca_antisym=data.ca_antisym,  # SAME data
+                    position_centered_mm=data.position_centered,  # SAME positions
+                    wavelength_nm=data.wavelength_nm,  # SAME wavelength
+                    params=fit_result.params,  # UPDATED params
+                )
+
+                if result_new is None:
+                    print("✗ Fit failed")
+                    return
+
+                print("✓ Fit successful")
+                print(f"  R²: {result_new.r_squared:.6f}")
+                print(f"  χ²: {result_new.chi_squared:.6f}")
+
+            else:  # OA
+                # Get CA reference for beamwaist
+                ca_result = self.fit_results.get((sample_val, "CA"))
+                if ca_result is None:
+                    print("✗ Need CA reference for beamwaist")
+                    return
+
+                result_new = OpenAperturePhysics.fit_oa_manual(
+                    oa=data.oa,  # SAME data
+                    position_centered_mm=data.position_centered,  # SAME positions
+                    wavelength_nm=data.wavelength_nm,  # SAME wavelength
+                    beamwaist_m=ca_result.params.beamwaist,  # From CA fit
+                    beta=fit_result.params.amplitude,  # Updated amplitude
+                    zero_level=fit_result.params.zero_level,  # Updated
+                    centerpoint=fit_result.params.centerpoint,  # Updated
+                    d0_m=0.26,  # Config
+                    ra_m=0.001,  # Config
+                )
+
+                if result_new is None:
+                    print("✗ Fit failed")
+                    return
+
+                print("✓ Fit successful")
+                print(f"  R²: {result_new.r_squared:.6f}")
+                print(f"  χ²: {result_new.chi_squared:.6f}")
+
+        except Exception as e:
+            print(f"✗ Error during fit: {e}")
+            import traceback
+
+            traceback.print_exc()
+            return
+
+        # ============================================================
+        # STEP 4: Update fit_result with new curve
+        # ============================================================
+        fit_result.y_fit = result_new.y_fit  # Store the new curve
+        fit_result.r_squared = result_new.r_squared
+        fit_result.chi_squared = result_new.chi_squared
+        if result_new.n2 is not None:
+            fit_result.n2 = result_new.n2
+
+        print(f"\n✓ Stored new y_fit curve ({len(fit_result.y_fit)} points)")
+
+        # ============================================================
+        # STEP 5: Update UI display values
+        # ============================================================
+        # Update spinbox if it exists
         if config.spinbox_name:
             spinbox = getattr(self, config.spinbox_name, None)
             if spinbox:
                 spinbox.blockSignals(True)
                 spinbox.setValue(physical_value)
                 spinbox.blockSignals(False)
-        
-        # Status message
-        status_msg = (
-            f"{sample_val.upper()} {aperture_val} - {param_name}: {physical_value:.4f}"
+                print(f"✓ Updated spinbox: {config.spinbox_name}")
+
+        # Update status bar
+        self.statusbar.showMessage(
+            f"{sample_val.upper()} {aperture_val} - {config.param_name}: {physical_value:.4f}"
         )
-        self.statusbar.showMessage(status_msg)
-        
-        # Get canvas
-        key = f"{sample_val}_{aperture_val}"
-        if key not in self.canvases:
-            return
-        
-        canvas_dict = self.canvases[key]
-        ax = canvas_dict["ax"]
-        fig = canvas_dict["fig"]
-        canvas_widget = canvas_dict["canvas"]
-        
-        x = data.position_centered
-        y_raw = data.ca_antisym if aperture_val == "CA" else data.oa
-                
-        if param_name == "zero_level":
-            # Shift curve: y_new = y_current + (new_zero - old_zero)
-            old_zero = fit_result.params.zero_level
-            shift = physical_value - old_zero
-            fit_result.y_fit = fit_result.y_fit + shift
-            fit_result.params.zero_level = physical_value
-        
-        elif param_name == "DPhi0":
-            # Scale amplitude: y_new = zero + (y_current - zero) * (new_amp / old_amp)
-            old_amp = fit_result.params.amplitude
-            old_zero = fit_result.params.zero_level
-            
-            if old_amp != 0:
-                scale = physical_value / old_amp
-                fit_result.y_fit = old_zero + (fit_result.y_fit - old_zero) * scale
-            
-            fit_result.params.amplitude = physical_value
-        
-        elif param_name == "z0":
-            # Scale peak width
-            wavelength = data.wavelength_nm * 1e-9
-            z0_m = physical_value * 1e-3
-            new_beamwaist = np.sqrt(z0_m * wavelength / np.pi)
-            
-            old_beamwaist = fit_result.params.beamwaist
-            old_zero = fit_result.params.zero_level
-            
-            if old_beamwaist > 0 and new_beamwaist > 0:
-                scale = old_beamwaist / new_beamwaist
-                fit_result.y_fit = old_zero + (fit_result.y_fit - old_zero) * scale
-            
-            fit_result.params.beamwaist = new_beamwaist
-        
-        elif param_name == "centerpoint":
-            # Use pre-calculated extended curve and shift to new center
-            old_center = fit_result.params.centerpoint
-            center_shift_points = int(physical_value - old_center)
-            
-            if center_shift_points != 0:
-                # Get the pre-calculated extended curve (calculated once during fit)
-                y_extended = self.fitted_curves_extended.get((sample_val, aperture_val))
-                
-                if y_extended is not None:
-                    # Roll the extended curve to the new center position
-                    y_fit_shifted = np.roll(y_extended, center_shift_points)
-                    # Trim to original length
-                    fit_result.y_fit = y_fit_shifted[:len(fit_result.y_fit)]
-                else:
-                    # Fallback: just roll current curve if extended not available
-                    fit_result.y_fit = np.roll(fit_result.y_fit, center_shift_points)
-            
-            fit_result.params.centerpoint = physical_value
-        
-        # Clear and redraw (exactly like minimal test)
-        ax.clear()
-        
-        # Check for ROI
-        roi_selector = self.roi_selectors.get(key)
-        if roi_selector and roi_selector.roi_limits:
-            mask = roi_selector.get_mask(x)
-            ax.scatter(
-                x[~mask],
-                y_raw[~mask],
-                color="gray",
-                s=15,
-                alpha=0.3,
-                label="Outside ROI",
-            )
-            ax.scatter(
-                x[mask],
-                y_raw[mask],
-                color="#3b82f6",
-                s=30,
-                alpha=0.7,
-                label="Inside ROI",
-            )
-        else:
-            ax.scatter(x, y_raw, color="#3b82f6", s=30, alpha=0.7, label="Data")
-        
-        # Plot fit curve
-        ax.plot(x, fit_result.y_fit, color="#ef4444", linewidth=2, label="Fit")
-        
-        # Labels
-        ax.set_xlabel("Position (mm)")
-        ylabel = "ΔT/T₀" if aperture_val == "CA" else "1 - T"
-        ax.set_ylabel(ylabel)
-        ax.set_title(f"{sample_val.upper()} {aperture_val} Z-scan")
-        ax.grid(True, alpha=0.3)
-        ax.legend()
-        
-        fig.tight_layout()
-        canvas_widget.draw()
-        
-        # Update parameter spinboxes
-        prefix = f"{sample_val}{aperture_val}"
-        
-        if aperture_val == "CA":
-            amp_widget = f"{prefix}_deltaPhi0Summary_doubleSpinBox"
-        else:
-            amp_widget = f"{prefix}_TSummary_doubleSpinBox"
-        
-        if hasattr(self, amp_widget):
-            widget = getattr(self, amp_widget)
-            widget.blockSignals(True)
-            widget.setValue(fit_result.params.amplitude)
-            widget.blockSignals(False)
-        
-        if aperture_val == "CA":
-            bw_widget = f"{prefix}_beamwaistSummary_doubleSpinBox"
-            if hasattr(self, bw_widget):
-                widget = getattr(self, bw_widget)
-                widget.blockSignals(True)
-                widget.setValue(fit_result.params.beamwaist * 1e6)
-                widget.blockSignals(False)
-        
-        print(f"✓ {sample_val} {aperture_val} - {param_name}: {physical_value:.4f}")
+
+        # Update canvas
+        self.plot_data(sample_val, aperture_val, data, fit_result)
+
+        # ============================================================
+        # STEP 7: Update result display spinboxes
+        # ============================================================
+        try:
+            prefix = f"{sample_val}{aperture_val}"
+
+            # Amplitude spinbox
+            if aperture_val == "CA":
+                amp_widget_name = f"{prefix}_deltaPhi0Summary_doubleSpinBox"
+            else:
+                amp_widget_name = f"{prefix}_TSummary_doubleSpinBox"
+
+            amp_widget = getattr(self, amp_widget_name, None)
+            if amp_widget:
+                amp_widget.blockSignals(True)
+                amp_widget.setValue(fit_result.params.amplitude)
+                amp_widget.blockSignals(False)
+
+            # Beamwaist spinbox
+            bw_widget_name = f"{prefix}_beamwaistSummary_doubleSpinBox"
+            bw_widget = getattr(self, bw_widget_name, None)
+            if bw_widget:
+                bw_widget.blockSignals(True)
+                bw_widget.setValue(fit_result.params.beamwaist * 1e6)
+                bw_widget.blockSignals(False)
+
+            # Zero level spinbox
+            zl_widget_name = f"{prefix}_zeroLevel_doubleSpinBox"
+            zl_widget = getattr(self, zl_widget_name, None)
+            if zl_widget:
+                zl_widget.blockSignals(True)
+                zl_widget.setValue(fit_result.params.zero_level)
+                zl_widget.blockSignals(False)
+
+            print("✓ Updated result display spinboxes")
+
+        except Exception as e:
+            print(f"! Error updating spinboxes: {e}")
+
+        print(f"{'=' * 70}")
+        print("✓ SLIDER CHANGE COMPLETE")
+        print(f"{'=' * 70}\n")
 
     def plot_data(
         self,
@@ -1060,6 +1105,31 @@ class ZScanMainWindow(QMainWindow):
         except Exception as e:
             print(f"! Plot error: {e}")
 
+    def _infer_amplitude_sign_from_fit_curve(self, y_fit: np.ndarray) -> int:
+        """
+        Infer amplitude sign from the fitted curve shape
+
+        For CA fitted curves:
+        - Positive DPhi0: Peak (maximum) comes before Valley (minimum)
+        - Negative DPhi0: Valley (minimum) comes before Peak (maximum)
+
+        Args:
+            y_fit: The fitted curve array
+
+        Returns:
+            +1 for positive amplitude, -1 for negative amplitude
+        """
+        # Find indices of peak and valley
+        max_idx = np.argmax(y_fit)
+        min_idx = np.argmin(y_fit)
+
+        # If minimum comes before maximum: negative amplitude
+        # If maximum comes before minimum: positive amplitude
+        if min_idx < max_idx:
+            return -1
+        else:
+            return 1
+
     def on_fit_clicked(self, sample_type: str, aperture: str):
         """Handle fit button click"""
         data_map = {
@@ -1098,7 +1168,7 @@ class ZScanMainWindow(QMainWindow):
 
             # Create and start fitting thread
             fit_thread = FittingThread(
-                ClosedAperturePhysics.fit_ca,
+                ClosedAperturePhysics.fit_ca_automatic,
                 f"{sample_type}_{aperture}",
                 ca_antisym=data.ca_antisym,
                 position_centered_mm=data.position_centered,
@@ -1138,7 +1208,7 @@ class ZScanMainWindow(QMainWindow):
                 return
 
             fit_thread = FittingThread(
-                OpenAperturePhysics.fit_oa,
+                OpenAperturePhysics.fit_oa_automatic,
                 f"{sample_type}_{aperture}",
                 oa=data.oa,
                 position_centered_mm=data.position_centered,
@@ -1167,6 +1237,23 @@ class ZScanMainWindow(QMainWindow):
             "sample": "sample_ca",
         }
 
+        if aperture == "CA":
+            inferred_sign = self._infer_amplitude_sign_from_fit_curve(
+                result.y_fit
+            )
+            # The physics engine always returns positive
+            # Correct it if the curve shows it should be negative
+            if inferred_sign < 0 and result.params.amplitude > 0:
+                result.params.amplitude *= -1
+                print(
+                    f"✓ Corrected amplitude sign from fit curve: {result.params.amplitude:.4f}"
+                )
+            elif inferred_sign > 0 and result.params.amplitude < 0:
+                result.params.amplitude *= -1
+                print(
+                    f"✓ Corrected amplitude sign from fit curve: {result.params.amplitude:.4f}"
+                )
+
         # Store result and mark as fitted
         self.fit_results[(sample_type, aperture)] = result
         self.config.mark_fitted(sample_type, aperture)
@@ -1185,6 +1272,18 @@ class ZScanMainWindow(QMainWindow):
 
         # Update results display
         self._update_result_display(sample_type, aperture, result)
+
+        # Update ALL sliders after automatic fit
+        self.slider_controller.set_slider_values(
+            sample_type=SampleType(sample_type),
+            aperture=ApertureType(aperture),
+            param_values={
+                "amplitude": result.params.amplitude,
+                "zero_level": result.params.zero_level,
+                "centerpoint": result.params.centerpoint,
+                "beamwaist": result.params.beamwaist,
+            },
+        )
 
         # Update status
         self.statusbar.showMessage(

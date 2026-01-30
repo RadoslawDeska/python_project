@@ -29,6 +29,10 @@ class FittingParams:
     d0: float  # aperture distance (meters)
     ra: float  # aperture radius (meters)
 
+    def get_amplitude_for_physics(self) -> float:
+        """Return absolute value for physics calculations"""
+        return abs(self.amplitude)
+
 
 @dataclass
 class FittingResult:
@@ -70,7 +74,7 @@ class ClosedAperturePhysics:
         z_pv = abs(pos_m[max_idx] - pos_m[min_idx])
         pv_amp = ca_antisym[max_idx] - ca_antisym[min_idx]
 
-        # Estimate Rayleigh range
+        # Estimate Rayleigh range and get beam waist
         wavelength = wavelength_nm * 1e-9
         z0 = z_pv / 1.7
         beamwaist = np.sqrt(z0 * wavelength / np.pi)
@@ -83,10 +87,10 @@ class ClosedAperturePhysics:
         S = np.clip(S, 0, 1)
 
         coefficient = 0.405 * (1 - S) ** 0.25
-        dphi0 = pv_amp / coefficient
+        DPhi0 = pv_amp / coefficient
 
         return FittingParams(
-            amplitude=dphi0,
+            amplitude=DPhi0,
             beamwaist=beamwaist,
             zero_level=1.0,
             centerpoint=0.0,
@@ -95,14 +99,14 @@ class ClosedAperturePhysics:
         )
 
     @staticmethod
-    def fit_ca(
+    def fit_ca_manual(
         ca_antisym: np.ndarray,
         position_centered_mm: np.ndarray,
         wavelength_nm: float,
         params: FittingParams,
     ) -> Optional[FittingResult]:
         """
-        Fit CA data using physics model
+        Generate CA curve using physics model and provided arguments.
 
         Args:
             ca_antisym: Antisymmetrized CA data
@@ -123,11 +127,15 @@ class ClosedAperturePhysics:
             # Calculate n2
             n2 = ClosedAperturePhysics.estimate_n2(wavelength_nm)
 
+            amplitude_mag = (
+                params.get_amplitude_for_physics()
+            )  # Get positive value
+
             # Create integration object
             integration = Integration(  # type: ignore
                 beta=0,
                 n2=n2,
-                DPhi0=params.amplitude,
+                DPhi0=amplitude_mag,
                 positions=positions,
                 d0=params.d0,
                 aperture_radius=params.ra,
@@ -139,7 +147,7 @@ class ClosedAperturePhysics:
             )
 
             # Create fitter
-            fitter = Fitting(           # type: ignore
+            fitter = Fitting(  # type: ignore
                 integration=integration,
                 amplitude=params.amplitude,
                 beamwaist=params.beamwaist,
@@ -181,6 +189,102 @@ class ClosedAperturePhysics:
         except Exception as e:
             print(f"Fitting error: {e}")
             import traceback
+
+            traceback.print_exc()
+            return None
+
+    @staticmethod
+    def fit_ca_automatic(
+        ca_antisym: np.ndarray,
+        position_centered_mm: np.ndarray,
+        wavelength_nm: float,
+        params: FittingParams,
+    ) -> Optional[FittingResult]:
+        """
+        Optimize fit to CA data using physics model
+
+        Args:
+            ca_antisym: Antisymmetrized CA data
+            position_centered_mm: Position array centered at focal point
+            wavelength_nm: Wavelength in nanometers
+            params: Fitting parameters
+
+        Returns:
+            FittingResult with fit curve and metrics, or None if failed
+        """
+        try:
+            wavelength = wavelength_nm * 1e-9
+            z_range = (
+                np.max(position_centered_mm) - np.min(position_centered_mm)
+            ) * 1e-3
+            positions = position_centered_mm * 1e-3  # Convert to meters
+
+            # Calculate n2
+            n2 = ClosedAperturePhysics.estimate_n2(wavelength_nm)
+
+            amplitude_mag = (
+                params.get_amplitude_for_physics()
+            )  # Get positive value
+
+            # Create integration object
+            integration = Integration(  # type: ignore
+                beta=0,
+                n2=n2,
+                DPhi0=amplitude_mag,
+                positions=positions,
+                d0=params.d0,
+                aperture_radius=params.ra,
+                wavelength=wavelength,
+                beamwaist=params.beamwaist,
+                n_components=N_COMPONENTS,
+                integration_steps=INTEGRATION_STEPS,
+                stype="CA",
+            )
+
+            # Create fitter
+            fitter = Fitting(  # type: ignore
+                integration=integration,
+                amplitude=params.amplitude,
+                beamwaist=params.beamwaist,
+                zero_level=params.zero_level,
+                centerpoint=params.centerpoint,
+                nop=len(ca_antisym),
+                y_data=ca_antisym,
+            )
+
+            # Generate fit
+            y_fit = fitter.manual(
+                zero_level=params.zero_level,
+                centerpoint=params.centerpoint,
+                amplitude=params.amplitude,
+                beamwaist=params.beamwaist,
+                z_range=z_range,
+                d0=params.d0,
+                ra=params.ra,
+                stype="CA",
+            )
+
+            y_fit = np.asarray(y_fit, dtype=float)
+
+            # Calculate metrics
+            residuals = y_fit - ca_antisym
+            ss_res = np.sum(residuals**2)
+            ss_tot = np.sum((ca_antisym - np.mean(ca_antisym)) ** 2)
+            r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
+            chi_squared = ss_res / len(ca_antisym)
+
+            return FittingResult(
+                y_fit=y_fit,
+                params=params,
+                r_squared=r_squared,
+                chi_squared=chi_squared,
+                n2=n2,
+            )
+
+        except Exception as e:
+            print(f"Fitting error: {e}")
+            import traceback
+
             traceback.print_exc()
             return None
 
@@ -189,7 +293,114 @@ class OpenAperturePhysics:
     """Physics for open aperture (absorption) measurements"""
 
     @staticmethod
-    def fit_oa(
+    def fit_oa_manual(
+        oa: np.ndarray,
+        position_centered_mm: np.ndarray,
+        wavelength_nm: float,
+        beamwaist_m: float,
+        beta: float,
+        zero_level: float = 1.0,
+        centerpoint: float = 0.0,
+        d0_m: float = 0.26,
+        ra_m: float = 0.001,
+        absorption_model: str = "2PA",
+    ) -> Optional[FittingResult]:
+        """
+        Generate OA curve using physics model and provided arguments.
+
+        Args:
+            oa: Open aperture (absorption) data
+            position_centered_mm: Position array centered at focal point
+            wavelength_nm: Wavelength in nanometers
+            beamwaist_m: Beam waist (from silica CA reference)
+            beta: Absorption coefficient
+            zero_level: Baseline transmittance
+            centerpoint: Position offset
+            d0_m: Aperture distance (meters)
+            ra_m: Aperture radius (meters)
+            absorption_model: '2PA', '3PA', '2PA+3PA', etc.
+
+        Returns:
+            FittingResult with fit curve and metrics, or None if failed
+        """
+        try:
+            wavelength = wavelength_nm * 1e-9
+            z_range = (
+                np.max(position_centered_mm) - np.min(position_centered_mm)
+            ) * 1e-3
+            positions = position_centered_mm * 1e-3  # Convert to meters
+
+            # Create integration object for OA
+            integration = Integration(  # type: ignore
+                beta=beta,
+                n2=0,  # No refraction for OA
+                DPhi0=0,
+                positions=positions,
+                d0=d0_m,
+                aperture_radius=ra_m,
+                wavelength=wavelength,
+                beamwaist=beamwaist_m,
+                n_components=N_COMPONENTS,
+                integration_steps=INTEGRATION_STEPS,
+                stype="OA",
+            )
+
+            # Create fitter
+            fitter = Fitting(  # type: ignore
+                integration=integration,
+                amplitude=beta,
+                beamwaist=beamwaist_m,
+                zero_level=zero_level,
+                centerpoint=centerpoint,
+                nop=len(oa),
+                y_data=oa,
+            )
+
+            # Generate fit
+            y_fit = fitter.manual(
+                zero_level=zero_level,
+                centerpoint=centerpoint,
+                amplitude=beta,
+                beamwaist=beamwaist_m,
+                z_range=z_range,
+                d0=d0_m,
+                ra=ra_m,
+                stype="OA",
+            )
+
+            y_fit = np.asarray(y_fit, dtype=float)
+
+            # Calculate metrics
+            residuals = y_fit - oa
+            ss_res = np.sum(residuals**2)
+            ss_tot = np.sum((oa - np.mean(oa)) ** 2)
+            r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
+            chi_squared = ss_res / len(oa)
+
+            return FittingResult(
+                y_fit=y_fit,
+                params=FittingParams(
+                    amplitude=beta,
+                    beamwaist=beamwaist_m,
+                    zero_level=zero_level,
+                    centerpoint=centerpoint,
+                    d0=d0_m,
+                    ra=ra_m,
+                ),
+                r_squared=r_squared,
+                chi_squared=chi_squared,
+                n2=0,  # Not applicable for OA
+            )
+
+        except Exception as e:
+            print(f"OA Fitting error: {e}")
+            import traceback
+
+            traceback.print_exc()
+            return None
+
+    @staticmethod
+    def fit_oa_automatic(
         oa: np.ndarray,
         position_centered_mm: np.ndarray,
         wavelength_nm: float,
@@ -291,6 +502,7 @@ class OpenAperturePhysics:
         except Exception as e:
             print(f"OA Fitting error: {e}")
             import traceback
+
             traceback.print_exc()
             return None
 
@@ -333,7 +545,7 @@ if __name__ == "__main__":
 
     # Try fitting
     print("Running physics fit...")
-    result = ClosedAperturePhysics.fit_ca(
+    result = ClosedAperturePhysics.fit_ca_manual(
         processed.ca_antisym,
         processed.position_centered,
         processed.wavelength_nm,

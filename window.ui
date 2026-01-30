@@ -1395,7 +1395,7 @@ border:None;</string>
         </rect>
        </property>
        <property name="currentIndex">
-        <number>1</number>
+        <number>2</number>
        </property>
        <widget class="QWidget" name="silicaTab">
         <attribute name="title">
@@ -1608,12 +1608,12 @@ border:None;</string>
                </font>
               </property>
               <property name="text">
-               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;right&quot;&gt;Z&lt;span style=&quot; vertical-align:sub;&quot;&gt;Rayleigh&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;right&quot;&gt;Beamwaist&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
               </property>
              </widget>
             </item>
             <item row="1" column="1">
-             <widget class="QSlider" name="silicaCA_RayleighLength_slider">
+             <widget class="QSlider" name="silicaCA_Beamwaist_slider">
               <property name="enabled">
                <bool>false</bool>
               </property>
@@ -2433,7 +2433,7 @@ border:None;</string>
           <enum>QTabWidget::North</enum>
          </property>
          <property name="currentIndex">
-          <number>1</number>
+          <number>0</number>
          </property>
          <widget class="QWidget" name="tab_2">
           <attribute name="title">
@@ -3236,7 +3236,7 @@ border:None;</string>
              </widget>
             </item>
             <item row="1" column="1">
-             <widget class="QSlider" name="solventCA_RayleighLength_slider">
+             <widget class="QSlider" name="solventCA_Beamwaist_slider">
               <property name="enabled">
                <bool>false</bool>
               </property>
@@ -3266,7 +3266,7 @@ border:None;</string>
                </font>
               </property>
               <property name="text">
-               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;right&quot;&gt;Z&lt;span style=&quot; vertical-align:sub;&quot;&gt;Rayleigh&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;right&quot;&gt;Beamwaist&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
               </property>
              </widget>
             </item>
@@ -4359,7 +4359,7 @@ border:None;</string>
           <enum>QTabWidget::North</enum>
          </property>
          <property name="currentIndex">
-          <number>1</number>
+          <number>0</number>
          </property>
          <widget class="QWidget" name="tab_8">
           <attribute name="title">
@@ -5162,7 +5162,7 @@ border:None;</string>
              </widget>
             </item>
             <item row="1" column="1">
-             <widget class="QSlider" name="sampleCA_RayleighLength_slider">
+             <widget class="QSlider" name="sampleCA_Beamwaist_slider">
               <property name="enabled">
                <bool>false</bool>
               </property>
@@ -5192,7 +5192,7 @@ border:None;</string>
                </font>
               </property>
               <property name="text">
-               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;right&quot;&gt;Z&lt;span style=&quot; vertical-align:sub;&quot;&gt;Rayleigh&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;right&quot;&gt;Beamwaist&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
               </property>
              </widget>
             </item>
@@ -7079,7 +7079,7 @@ QPushButton::pressed{border-style:inset}</string>
   <tabstop>silicaAperture_tabWidget</tabstop>
   <tabstop>silicaCA_zeroLevel_slider</tabstop>
   <tabstop>silicaCA_DPhi0_slider</tabstop>
-  <tabstop>silicaCA_RayleighLength_slider</tabstop>
+  <tabstop>silicaCA_Beamwaist_slider</tabstop>
   <tabstop>silicaCA_fit_pushButton</tabstop>
   <tabstop>silicaCA_deltaPhi0Summary_doubleSpinBox</tabstop>
   <tabstop>silicaCA_laserIntensitySummary_doubleSpinBox</tabstop>
