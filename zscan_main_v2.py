@@ -1131,7 +1131,7 @@ class ZScanMainWindow(QMainWindow):
             return 1
 
     def on_fit_clicked(self, sample_type: str, aperture: str):
-        """Handle fit button click"""
+        """Handle fit button click. Call automatic fit."""
         data_map = {
             "silica": "silica_ca",
             "solvent": "solvent_ca",
@@ -1229,7 +1229,9 @@ class ZScanMainWindow(QMainWindow):
         fit_thread.start()
 
     def _on_fit_done(self, sample_aperture: str, result: FittingResult):
-        """Fit completed successfully - STORE ORIGINAL CURVE"""
+        """Fit completed successfully - STORE ORIGINAL CURVE
+        
+        Called on automatic fitting."""
         sample_type, aperture = sample_aperture.rsplit("_", 1)
         data_map = {
             "silica": "silica_ca",
