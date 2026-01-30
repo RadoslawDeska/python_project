@@ -823,6 +823,9 @@ class ZScanMainWindow(QMainWindow):
         self.slider_controller.connect_sliders(
             sample_enum, ApertureType.CA, self.on_slider_changed
         )
+        self.slider_controller.connect_sliders(
+            sample_enum, ApertureType.OA, self.on_slider_changed
+        )
 
         self.statusbar.showMessage(f"✓ Loaded {raw.sample_code}")
 
@@ -836,12 +839,6 @@ class ZScanMainWindow(QMainWindow):
     ):
         """
         Handle slider value change - update fit curve in real-time
-
-        Directly mirrors the notebook workflow from testing.ipynb:
-        - Get current fit result
-        - Update ONE parameter value
-        - Call fit function with SAME data but UPDATED params
-        - Plot the result
         """
         sample_val = sample_type.value
         aperture_val = aperture.value
@@ -1105,30 +1102,56 @@ class ZScanMainWindow(QMainWindow):
         except Exception as e:
             print(f"! Plot error: {e}")
 
-    def _infer_amplitude_sign_from_fit_curve(self, y_fit: np.ndarray) -> int:
+    def _infer_amplitude_sign_from_data(
+        self, ca_antisym: np.ndarray, position_centered_mm: np.ndarray
+    ) -> int:
         """
-        Infer amplitude sign from the fitted curve shape
+        Infer amplitude sign from Z-position of peak and valley in centered coordinates.
 
-        For CA fitted curves:
-        - Positive DPhi0: Peak (maximum) comes before Valley (minimum)
-        - Negative DPhi0: Valley (minimum) comes before Peak (maximum)
+        Centered coordinates mean: focus (Z=0) is at center of data range.
+        Negative Z: before focus
+        Positive Z: after focus
+
+        Physics interpretation:
+        - Peak before focus (negative Z), valley after focus (positive Z) → NEGATIVE
+        - Valley before focus (negative Z), peak after focus (positive Z) → POSITIVE
 
         Args:
-            y_fit: The fitted curve array
+            ca_antisym: Antisymmetrized CA data
+            position_centered_mm: Z-positions centered at focus (0 at focus)
 
         Returns:
-            +1 for positive amplitude, -1 for negative amplitude
+            +1 for positive DPhi0, -1 for negative DPhi0
         """
-        # Find indices of peak and valley
-        max_idx = np.argmax(y_fit)
-        min_idx = np.argmin(y_fit)
+        max_idx = np.argmax(ca_antisym)
+        min_idx = np.argmin(ca_antisym)
 
-        # If minimum comes before maximum: negative amplitude
-        # If maximum comes before minimum: positive amplitude
-        if min_idx < max_idx:
+        peak_z = position_centered_mm[max_idx]
+        valley_z = position_centered_mm[min_idx]
+
+        # Both valleys and peaks should be roughly symmetric around focus
+        # Check which comes first along the Z-axis
+
+        if peak_z < 0 and valley_z > 0:
+            # Peak at negative Z (before focus), valley at positive Z (after focus)
+            # → Self-defocusing (negative)
             return -1
+        elif valley_z < 0 and peak_z > 0:
+            # Valley at negative Z (before focus), peak at positive Z (after focus)
+            # → Self-focusing (positive)
+            return +1
+        elif peak_z < 0 and valley_z < 0:
+            # Both before focus - peak is closer to focus
+            # → Self-defocusing (negative)
+            return -1 if abs(peak_z) < abs(valley_z) else +1
+        elif peak_z > 0 and valley_z > 0:
+            # Both after focus - valley is closer to focus
+            # → Self-focusing (positive)
+            return +1 if abs(valley_z) < abs(peak_z) else -1
         else:
-            return 1
+            # Shouldn't happen for well-behaved Z-scan data
+            print("⚠ Warning: Unexpected peak/valley configuration")
+            return +1  # Default to positive
 
     def on_fit_clicked(self, sample_type: str, aperture: str):
         """Handle fit button click. Call automatic fit."""
@@ -1207,6 +1230,14 @@ class ZScanMainWindow(QMainWindow):
                 )
                 return
 
+            absorption_model_combo = f"{sample_type}OA_absorptionModel_comboBox"
+            if hasattr(self, absorption_model_combo):
+                selected_model = getattr(
+                    self, absorption_model_combo
+                ).currentText()
+            else:
+                selected_model = "2PA"
+
             fit_thread = FittingThread(
                 OpenAperturePhysics.fit_oa_automatic,
                 f"{sample_type}_{aperture}",
@@ -1219,6 +1250,7 @@ class ZScanMainWindow(QMainWindow):
                 centerpoint=0.0,
                 d0_m=new_params["d0_mm"] * 1e-3,
                 ra_m=new_params["aperture_diameter_mm"] * 1e-3 / 2,
+                absorption_model=selected_model,
             )
 
         # Connect signals
@@ -1229,9 +1261,7 @@ class ZScanMainWindow(QMainWindow):
         fit_thread.start()
 
     def _on_fit_done(self, sample_aperture: str, result: FittingResult):
-        """Fit completed successfully - STORE ORIGINAL CURVE
-        
-        Called on automatic fitting."""
+        """Fit completed successfully - handle amplitude sign based on Z-position."""
         sample_type, aperture = sample_aperture.rsplit("_", 1)
         data_map = {
             "silica": "silica_ca",
@@ -1240,21 +1270,38 @@ class ZScanMainWindow(QMainWindow):
         }
 
         if aperture == "CA":
-            inferred_sign = self._infer_amplitude_sign_from_fit_curve(
-                result.y_fit
-            )
-            # The physics engine always returns positive
-            # Correct it if the curve shows it should be negative
-            if inferred_sign < 0 and result.params.amplitude > 0:
-                result.params.amplitude *= -1
-                print(
-                    f"✓ Corrected amplitude sign from fit curve: {result.params.amplitude:.4f}"
+            # ============================================================
+            # NEW: Correct amplitude sign based on Z-position of peak/valley
+            # ============================================================
+            data = self.data.get(data_map[sample_type])
+            if data is not None:
+                # Use CENTERED position (focus at 0)
+                inferred_sign = self._infer_amplitude_sign_from_data(
+                    data.ca_antisym, data.position_centered
                 )
-            elif inferred_sign > 0 and result.params.amplitude < 0:
-                result.params.amplitude *= -1
-                print(
-                    f"✓ Corrected amplitude sign from fit curve: {result.params.amplitude:.4f}"
-                )
+                amplitude_before = result.params.amplitude
+
+                # Apply sign correction
+                if inferred_sign < 0 and result.params.amplitude > 0:
+                    result.params.amplitude *= -1
+                    print(
+                        f"✓ Corrected amplitude sign (neg): "
+                        f"{amplitude_before:+.6f} → {result.params.amplitude:+.6f}"
+                    )
+                elif inferred_sign > 0 and result.params.amplitude < 0:
+                    result.params.amplitude *= -1
+                    print(
+                        f"✓ Corrected amplitude sign (pos): "
+                        f"{amplitude_before:+.6f} → {result.params.amplitude:+.6f}"
+                    )
+                else:
+                    print(
+                        f"✓ Amplitude sign confirmed: "
+                        f"{result.params.amplitude:+.6f} "
+                        f"({'positive' if inferred_sign > 0 else 'negative'})"
+                    )
+            else:
+                print("⚠ Could not verify amplitude sign (no data available)")
 
         # Store result and mark as fitted
         self.fit_results[(sample_type, aperture)] = result
@@ -1276,6 +1323,13 @@ class ZScanMainWindow(QMainWindow):
         self._update_result_display(sample_type, aperture, result)
 
         # Update ALL sliders after automatic fit
+        param_values = {
+            "amplitude": result.params.amplitude,
+            "zero_level": result.params.zero_level,
+            "centerpoint": result.params.centerpoint,
+            "beamwaist": result.params.beamwaist,
+        }
+        print(param_values)
         self.slider_controller.set_slider_values(
             sample_type=SampleType(sample_type),
             aperture=ApertureType(aperture),

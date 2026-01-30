@@ -75,10 +75,10 @@ class SliderController:
             "beamwaist": SliderConfig(
                 slider_name="silicaCA_Beamwaist_slider",
                 spinbox_name="silicaCA_beamwaistSummary_doubleSpinBox",
-                param_name="z0",  # in [mm]
-                min_val=0.0,
-                max_val=1.0,
-                step=0.1,
+                param_name="beamwaist",  # in meters
+                min_val=5e-6,
+                max_val=150e-6,
+                step=1,
                 display_format="{:.2f}",
             ),
         },
@@ -114,7 +114,7 @@ class SliderController:
             "beamwaist": SliderConfig(
                 slider_name="solventCA_Beamwaist_slider",
                 spinbox_name="solventCA_beamwaistSummary_doubleSpinBox",
-                param_name="z0",
+                param_name="beamwaist",
                 min_val=0.0,
                 max_val=1.0,
                 step=0.1,
@@ -153,7 +153,7 @@ class SliderController:
             "beamwaist": SliderConfig(
                 slider_name="sampleCA_Beamwaist_slider",
                 spinbox_name="sampleCA_beamwaistSummary_doubleSpinBox",
-                param_name="z0",
+                param_name="beamwaist",
                 min_val=0.0,
                 max_val=1.0,
                 step=0.1,

@@ -180,7 +180,7 @@ class ZScanProcessor:
         n = len(raw.ca_raw)
         center_idx = n // 2
         z_range = abs(raw.end_pos - raw.start_pos)
-        center_pos = raw.start_pos + z_range / 2.0
+        center_pos = (raw.start_pos + raw.end_pos) / 2.0
         
         # Normalize by reference
         ca = raw.ca_raw / raw.ref
