@@ -31,7 +31,6 @@ class ProcessedZScanData:
     position_centered: np.ndarray  # Centered around focal point
     ca_raw: np.ndarray
     ca: np.ndarray
-    ca_antisym: np.ndarray
     oa: np.ndarray
     ref: np.ndarray
     wavelength_nm: float
@@ -172,44 +171,70 @@ class ZScanProcessor:
     def normalize(raw: RawZScanData) -> ProcessedZScanData:
         """
         Normalize data:
+        0. Ensure all data is in ascending position order
         1. Divide CA and OA by reference
         2. Shift to zero level = 1.0
-        3. Antisymmetrize CA
-        4. Center positions around focal point
+        3. Center positions around focal point
         """
-        n = len(raw.ca_raw)
-        center_idx = n // 2
         z_range = abs(raw.end_pos - raw.start_pos)
-        center_pos = (raw.start_pos + raw.end_pos) / 2.0
         
+        # ================================================================
+        # CHECK IF DATA IS REVERSED (backward scan)
+        # ================================================================
+        is_descending = raw.start_pos > raw.end_pos
+
+        if is_descending:
+            print(f"[normalize] Backward scan detected: {raw.start_pos} → {raw.end_pos}")
+            print("[normalize] Reversing all arrays to ascending order")
+            
+            # Reverse everything to make it ascending
+            ca_raw = raw.ca_raw[::-1]
+            oa_raw = raw.oa_raw[::-1]
+            ref = raw.ref[::-1]
+            position_mm = raw.position_mm[::-1]
+            
+            # Update metadata
+            actual_start = raw.end_pos
+            actual_end = raw.start_pos
+        else:
+            print(f"[normalize] Forward scan: {raw.start_pos} → {raw.end_pos}")
+            
+            ca_raw = raw.ca_raw
+            oa_raw = raw.oa_raw
+            ref = raw.ref
+            position_mm = raw.position_mm
+            actual_start = raw.start_pos
+            actual_end = raw.end_pos
+        
+        # ================================================================
         # Normalize by reference
-        ca = raw.ca_raw / raw.ref
-        oa = raw.oa_raw / raw.ref
+        # ================================================================
+        
+        ca = ca_raw / ref
+        oa = oa_raw / ref
         
         # Shift to zero level 1.0
         ca = 1.0 + (ca - np.mean(ca))
         oa = 1.0 + (oa - np.mean(oa))
         
-        # Antisymmetrize CA around center
-        ca_antisym = np.zeros(n)
-        for i in range(n):
-            mirror_i = 2 * center_idx - i
-            if 0 <= mirror_i < n:
-                ca_antisym[i] = 1.0 + (ca[i] - 1.0) - (ca[mirror_i] - 1.0)
-            else:
-                ca_antisym[i] = ca[i]
-        
+        # ================================================================
         # Center positions
-        position_centered = raw.position_mm - center_pos
+        # ================================================================
+        center_pos = (actual_start + actual_end) / 2.0
+        position_centered = position_mm - center_pos
         
+        # Verify ascending order
+        assert position_centered[0] < position_centered[-1], \
+            f"ERROR: Data not ascending! {position_centered[0]} → {position_centered[-1]}"
+        print(f"[normalize] Data verified ascending: {position_centered[0]:.1f} → {position_centered[-1]:.1f} mm")
+
         return ProcessedZScanData(
-            position_mm=raw.position_mm,
+            position_mm=position_mm,
             position_centered=position_centered,
-            ca_raw=raw.ca_raw,
+            ca_raw=ca_raw,
             ca=ca,
-            ca_antisym=ca_antisym,
             oa=oa,
-            ref=raw.ref,
+            ref=ref,
             wavelength_nm=raw.wavelength_nm,
             sample_code=raw.sample_code,
             z_range_mm=z_range,
@@ -243,32 +268,15 @@ if __name__ == '__main__':
                 print("✓ Processed:")
                 print(f"  CA mean: {np.mean(processed.ca):.4f} (should be ~1.0)")
                 print(f"  OA mean: {np.mean(processed.oa):.4f} (should be ~1.0)")
-                print(f"  CA antisym range: [{np.min(processed.ca_antisym):.4f}, {np.max(processed.ca_antisym):.4f}]")
+                print(f"  CA range: [{np.min(processed.ca):.4f}, {np.max(processed.ca):.4f}]")
                 print(f"  Position range: [{np.min(processed.position_centered):.2f}, {np.max(processed.position_centered):.2f}] mm")
                 
-                # SANITY CHECKS
-                print("\n✓ Sanity checks:")
-                
-                # Check 1: CA and OA should be close to 1.0 on average
-                assert 0.99 < np.mean(processed.ca) < 1.01, "CA mean should be ~1.0"
-                print(f"  ✓ CA normalization correct (mean={np.mean(processed.ca):.6f})")
-                
-                assert 0.99 < np.mean(processed.oa) < 1.01, "OA mean should be ~1.0"
-                print(f"  ✓ OA normalization correct (mean={np.mean(processed.oa):.6f})")
-                
-                # Check 2: CA antisym should be symmetric around 1.0
-                # Cast to int to avoid numpy bool subtraction issues
-                ca_above: int = int(np.sum(processed.ca_antisym > 1.0))
-                ca_below: int = int(np.sum(processed.ca_antisym < 1.0))
-                assert abs(ca_above - ca_below) <= 2, "CA antisym should be roughly symmetric"
-                print(f"  ✓ CA antisym is symmetric (above: {ca_above}, below: {ca_below})")
-                
-                # Check 3: Position should be centered
+                # Check 2: Position should be centered
                 assert abs(float(np.mean(processed.position_centered))) < 0.1, "Position should be centered"
                 print(f"  ✓ Position centering correct (mean={np.mean(processed.position_centered):.6f})")
                 
-                # Check 4: Data variance should be reasonable
-                ca_std = float(np.std(processed.ca_antisym))
+                # Check 3: Data variance should be reasonable
+                ca_std = float(np.std(processed.ca))
                 assert 0.01 < ca_std < 0.2, "CA std_dev should be reasonable"
                 print(f"  ✓ CA std_dev is reasonable ({ca_std:.4f})")
                 

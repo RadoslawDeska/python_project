@@ -387,7 +387,7 @@ class SliderController:
         if slider is None:
             return
 
-        slider_value = self.physical_to_slider(config, physical_value)
+        slider_value = self.physical_to_slider(config, physical_value, slider)
         slider.blockSignals(True)
         slider.setValue(slider_value)
         slider.blockSignals(False)

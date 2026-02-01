@@ -57,7 +57,7 @@ class ClosedAperturePhysics:
 
     @staticmethod
     def infer_initial_params(
-        ca_antisym: np.ndarray,
+        ca: np.ndarray,
         position_centered_mm: np.ndarray,
         wavelength_nm: float,
     ) -> FittingParams:
@@ -68,11 +68,11 @@ class ClosedAperturePhysics:
         pos_m = position_centered_mm * 1e-3  # Convert to meters
 
         # Find peak and valley
-        max_idx = np.argmax(ca_antisym)
-        min_idx = np.argmin(ca_antisym)
+        max_idx = np.argmax(ca)
+        min_idx = np.argmin(ca)
 
         z_pv = abs(pos_m[max_idx] - pos_m[min_idx])
-        pv_amp = ca_antisym[max_idx] - ca_antisym[min_idx]
+        pv_amp = ca[max_idx] - ca[min_idx]
 
         # Estimate Rayleigh range and get beam waist
         wavelength = wavelength_nm * 1e-9
@@ -87,7 +87,40 @@ class ClosedAperturePhysics:
         S = np.clip(S, 0, 1)
 
         coefficient = 0.405 * (1 - S) ** 0.25
-        DPhi0 = pv_amp / coefficient
+        dphi0_magnitude = pv_amp / coefficient
+
+        # ================================================================
+        # CRITICAL: Determine sign from peak/valley POSITIONS, not just amplitude
+        # ================================================================
+        # For positive DPhi0: valley before focus (negative z), peak after (positive z)
+        # For negative DPhi0: peak before focus (negative z), valley after (positive z)
+
+        peak_pos = pos_m[max_idx]
+        valley_pos = pos_m[min_idx]
+
+        print("\n[infer_initial_params]")
+        print(f"  Peak at z={peak_pos*1e3:.1f}mm (index {max_idx})")
+        print(f"  Valley at z={valley_pos*1e3:.1f}mm (index {min_idx})")
+
+        if valley_pos < 0 and peak_pos > 0:
+            # Valley before focus, peak after → positive DPhi0 ✓
+            sign = +1
+            print("  → Valley BEFORE focus, peak AFTER → DPhi0 is POSITIVE")
+        elif peak_pos < 0 and valley_pos > 0:
+            # Peak before focus, valley after → negative DPhi0 ✓
+            sign = -1
+            print("  → Peak BEFORE focus, valley AFTER → DPhi0 is NEGATIVE")
+        elif valley_pos < peak_pos:
+            # Valley comes first along position axis
+            sign = +1
+            print("  → Valley position < peak position → DPhi0 is POSITIVE")
+        else:
+            # Peak comes first along position axis
+            sign = -1
+            print("  → Peak position < valley position → DPhi0 is NEGATIVE")
+
+        DPhi0 = sign * dphi0_magnitude
+        print(f"  Calculated DPhi0: {DPhi0:+.6f}\n")
 
         return FittingParams(
             amplitude=DPhi0,
@@ -100,7 +133,7 @@ class ClosedAperturePhysics:
 
     @staticmethod
     def fit_ca_manual(
-        ca_antisym: np.ndarray,
+        ca: np.ndarray,
         position_centered_mm: np.ndarray,
         wavelength_nm: float,
         params: FittingParams,
@@ -109,7 +142,7 @@ class ClosedAperturePhysics:
         Generate CA curve using physics model and provided arguments.
 
         Args:
-            ca_antisym: Antisymmetrized CA data
+            ca: CA data
             position_centered_mm: Position array centered at focal point
             wavelength_nm: Wavelength in nanometers
             params: Fitting parameters
@@ -145,7 +178,7 @@ class ClosedAperturePhysics:
                 integration_steps=INTEGRATION_STEPS,
                 stype="CA",
             )
-
+            
             # Create fitter
             fitter = Fitting(  # type: ignore
                 integration=integration,
@@ -153,8 +186,8 @@ class ClosedAperturePhysics:
                 beamwaist=params.beamwaist,
                 zero_level=params.zero_level,
                 centerpoint=params.centerpoint,
-                nop=len(ca_antisym),
-                y_data=ca_antisym,
+                nop=len(ca),
+                y_data=ca,
             )
 
             # Generate fit
@@ -172,11 +205,11 @@ class ClosedAperturePhysics:
             y_fit = np.asarray(y_fit, dtype=float)
 
             # Calculate metrics
-            residuals = y_fit - ca_antisym
+            residuals = y_fit - ca
             ss_res = np.sum(residuals**2)
-            ss_tot = np.sum((ca_antisym - np.mean(ca_antisym)) ** 2)
+            ss_tot = np.sum((ca - np.mean(ca)) ** 2)
             r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
-            chi_squared = ss_res / len(ca_antisym)
+            chi_squared = ss_res / len(ca)
 
             return FittingResult(
                 y_fit=y_fit,
@@ -195,7 +228,7 @@ class ClosedAperturePhysics:
 
     @staticmethod
     def fit_ca_automatic(
-        ca_antisym: np.ndarray,
+        ca: np.ndarray,
         position_centered_mm: np.ndarray,
         wavelength_nm: float,
         params: FittingParams,
@@ -204,7 +237,7 @@ class ClosedAperturePhysics:
         Optimize fit to CA data using physics model
 
         Args:
-            ca_antisym: Antisymmetrized CA data
+            ca: CA data
             position_centered_mm: Position array centered at focal point
             wavelength_nm: Wavelength in nanometers
             params: Fitting parameters
@@ -248,8 +281,8 @@ class ClosedAperturePhysics:
                 beamwaist=params.beamwaist,
                 zero_level=params.zero_level,
                 centerpoint=params.centerpoint,
-                nop=len(ca_antisym),
-                y_data=ca_antisym,
+                nop=len(ca),
+                y_data=ca,
             )
 
             # Generate fit
@@ -263,11 +296,11 @@ class ClosedAperturePhysics:
             )
 
             # Calculate metrics
-            residuals = y_fit - ca_antisym
+            residuals = y_fit - ca
             ss_res = np.sum(residuals**2)
-            ss_tot = np.sum((ca_antisym - np.mean(ca_antisym)) ** 2)
+            ss_tot = np.sum((ca - np.mean(ca)) ** 2)
             r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
-            chi_squared = ss_res / len(ca_antisym)
+            chi_squared = ss_res / len(ca)
 
             return FittingResult(
                 y_fit=y_fit,
@@ -520,13 +553,13 @@ if __name__ == "__main__":
 
     processed = ZScanProcessor.normalize(raw)
     print(f"✓ Loaded: {processed.sample_code}")
-    print(f"  Points: {len(processed.ca_antisym)}")
+    print(f"  Points: {len(processed.ca)}")
     print(f"  λ: {processed.wavelength_nm} nm")
     print()
 
     # Infer initial parameters
     initial_params = ClosedAperturePhysics.infer_initial_params(
-        processed.ca_antisym,
+        processed.ca,
         processed.position_centered,
         processed.wavelength_nm,
     )
@@ -542,7 +575,7 @@ if __name__ == "__main__":
     # Try fitting
     print("Running physics fit...")
     result = ClosedAperturePhysics.fit_ca_manual(
-        processed.ca_antisym,
+        processed.ca,
         processed.position_centered,
         processed.wavelength_nm,
         initial_params,
